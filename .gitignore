@@ -1,0 +1,39 @@
+# === Secretos y configuración local (NUNCA subir) ===
+.env
+.env.*
+!.env.example
+*.key
+*.pem
+
+# === Python (backend) ===
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+env/
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# === Node / React (frontend) ===
+node_modules/
+dist/
+dist-ssr/
+*.local
+.vite/
+
+# === Datos y volúmenes locales de la BD ===
+data/
+*.sqlite
+*.db
+
+# === Editores / SO ===
+.vscode/
+.idea/
+*.swp
+.DS_Store
+
+# === Logs ===
+*.log
+logs/
