@@ -1,0 +1,34 @@
+# Infraestructura local de Argos.
+# Levanta la base de datos (TimescaleDB = Postgres + series temporales).
+# Uso:
+#   1. Copiar .env.example a .env y poner una contraseña real.
+#   2. docker-on   (encender Docker; alias personal)
+#   3. docker compose up -d
+#   4. docker compose ps   -> el servicio debe verse "healthy"
+
+services:
+  timescaledb:
+    # Imagen oficial de TimescaleDB sobre Postgres 16.
+    image: timescale/timescaledb:latest-pg16
+    container_name: argos_timescaledb
+    # Solo revive mientras Docker esté encendido; no autoarranca el sistema.
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # host:contenedor -> nos conectamos desde el backend en localhost:5432
+      - "${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      # Volumen con nombre: los datos sobreviven aunque borres el contenedor.
+      - argos_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      # Docker marca el contenedor "healthy" cuando Postgres acepta conexiones.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  argos_pgdata:
