@@ -1,0 +1,9 @@
+[project]
+name = "argos-backend"
+version = "0.1.0"
+description = "Backend de Argos — inteligencia de mercado cripto"
+requires-python = ">=3.13"
+dependencies = [
+    "fastapi>=0.115",      # framework web async
+    "uvicorn[standard]>=0.32",  # servidor ASGI que corre la app
+]

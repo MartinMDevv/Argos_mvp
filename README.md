@@ -41,13 +41,19 @@ Argos_MVP/
 ## Cómo levantarlo (se irá completando)
 
 ```bash
-# 1. Base de datos (requiere Docker encendido)
-#    cd infra && docker compose up -d
+# 1. Base de datos (requiere Docker encendido: docker-on)
+cd infra
+cp .env.example .env          # (solo la 1ª vez) y poné una contraseña
+docker compose up -d --wait   # levanta TimescaleDB
+docker compose ps             # debe verse "healthy"
 
-# 2. Backend
-#    cd backend && ...
+# 2. Backend (Python + FastAPI, gestionado con uv)
+cd backend
+uv sync                                              # instala dependencias
+uv run uvicorn app.main:app --reload --port 8000     # arranca la API
+# Verificar: http://localhost:8000/health  y  http://localhost:8000/docs
 
-# 3. Frontend
+# 3. Frontend (se agrega en el paso 0.4)
 #    cd frontend && ...
 ```
 

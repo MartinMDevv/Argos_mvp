@@ -33,7 +33,7 @@ Monolito modular, fronteras limpias. Detectores como plugins (agregar = enchufar
 Núcleo agnóstico de usuario (multiusuario/suscripción se añade encima, después).
 
 ## 7. Estado y norte
-Fase 0 (cimientos): 0.1 y 0.2 hechos (esqueleto + git; TimescaleDB viva); siguiente 0.3 FastAPI /health. Estado tildable en
+Fase 0 (cimientos): 0.1-0.3 hechos (esqueleto + git; TimescaleDB viva; FastAPI /health); siguiente 0.4 React+Vite+Tailwind. Estado tildable en
 CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0) hasta un
 posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 

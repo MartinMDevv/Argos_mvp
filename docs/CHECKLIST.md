@@ -13,7 +13,7 @@
 ## FASE 0 — Cimientos (las 3 patas respirando)
 - [x] **0.1** Esqueleto de carpetas + `.gitignore` + `README` *(hecho + commiteado)*
 - [x] **0.2** `infra/docker-compose.yml` con **TimescaleDB** → contenedor `healthy`, PG 16.14 + TimescaleDB 2.28.3 ✅
-- [ ] **0.3** Esqueleto **FastAPI** con endpoint `/health` → `localhost:8000/health` responde `ok`
+- [x] **0.3** Esqueleto **FastAPI** con endpoint `/health` → responde `{"status":"ok"}` + `/docs` OK ✅
 - [ ] **0.4** Esqueleto **React + Vite + Tailwind** → `localhost:5173` muestra la página de Argos
 - [ ] **0.5** Conexión backend ↔ base de datos verificada (FastAPI le habla a TimescaleDB)
 
@@ -50,4 +50,4 @@ Luego seguimos el **roadmap de versiones** (v1.1 → v5.0) del [spec](../../spec
 
 ---
 
-**👉 Estamos aquí:** listos para el **paso 0.3 — esqueleto FastAPI** (`/health`).
+**👉 Estamos aquí:** listos para el **paso 0.4 — esqueleto React + Vite + Tailwind**.
