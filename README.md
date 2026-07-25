@@ -17,11 +17,14 @@ a costo cero. Una IA local puede **explicarte** el estado del mercado on-demand 
 ```
 Argos_MVP/
 ├── backend/     → El cerebro: Python + FastAPI (ingesta, base de datos, detectores, IA, notificaciones)
-├── frontend/    → El panel: React + TypeScript (dashboard en tiempo real)
+├── frontend/    → El panel: React + TypeScript + Vite + Tailwind (dashboard en tiempo real)
 ├── infra/       → Docker Compose (TimescaleDB)
-├── .gitignore
+├── docs/        → Documentación viva (arquitectura, guía de arranque, checklist, contexto)
 └── README.md
 ```
+
+Detalle de cada carpeta y del mapa de componentes del frontend:
+[`docs/ARQUITECTURA.md`](docs/ARQUITECTURA.md).
 
 ## Stack
 
@@ -36,14 +39,18 @@ Argos_MVP/
 
 ## Estado
 
-🚧 **En construcción — Fase 0 (cimientos).** Aún no hace nada útil; se está montando la base.
+🚧 **En construcción — Fase 0 (cimientos), casi lista.** Las tres patas ya respiran por separado
+(base de datos viva, API `/health`, panel con toda la piel de Argos); aún **no están conectadas**
+entre sí. Estado tildable en [`docs/CHECKLIST.md`](docs/CHECKLIST.md).
 
-## Cómo levantarlo (se irá completando)
+## Cómo levantarlo
+
+Guía completa (requisitos, orden, gotchas): [`docs/COMO_CORRER.md`](docs/COMO_CORRER.md). En corto:
 
 ```bash
 # 1. Base de datos (requiere Docker encendido: docker-on)
 cd infra
-cp .env.example .env          # (solo la 1ª vez) y poné una contraseña
+cp .env.example .env          # (solo la 1ª vez) y pon una contraseña
 docker compose up -d --wait   # levanta TimescaleDB
 docker compose ps             # debe verse "healthy"
 
@@ -53,8 +60,10 @@ uv sync                                              # instala dependencias
 uv run uvicorn app.main:app --reload --port 8000     # arranca la API
 # Verificar: http://localhost:8000/health  y  http://localhost:8000/docs
 
-# 3. Frontend (se agrega en el paso 0.4)
-#    cd frontend && ...
+# 3. Frontend (React + Vite)
+cd frontend
+npm install                   # (solo la 1ª vez)
+npm run dev                   # http://localhost:5173  → el panel de Argos
 ```
 
 ---

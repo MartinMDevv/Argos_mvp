@@ -33,9 +33,11 @@ Monolito modular, fronteras limpias. Detectores como plugins (agregar = enchufar
 Núcleo agnóstico de usuario (multiusuario/suscripción se añade encima, después).
 
 ## 7. Estado y norte
-Fase 0 (cimientos): 0.1-0.3 hechos (esqueleto + git; TimescaleDB viva; FastAPI /health); siguiente 0.4 React+Vite+Tailwind. Estado tildable en
-CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0) hasta un
-posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
+Fase 0 (cimientos): 0.1-0.4 hechos (esqueleto + git; TimescaleDB viva; FastAPI /health; frontend
+React+Vite+Tailwind con la piel de Argos); siguiente 0.5 = conectar backend ↔ TimescaleDB. Estado
+tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
+hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
+Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.
 
 ## 8. Índice de documentos
 Salta a un doc solo si necesitas su detalle. Conforme avance el proyecto se agregan aquí los MD de avance.
@@ -44,5 +46,7 @@ Salta a un doc solo si necesitas su detalle. Conforme avance el proyecto se agre
 |---|---|---|
 | [`../../spec-crypto-monitor.md`](../../spec-crypto-monitor.md) | Spec completo: idea, metas, MVP, taxonomía de alertas, stack, roadmap v1→v5 | Dudas de alcance, diseño o el "por qué" de una decisión |
 | [`./CHECKLIST.md`](./CHECKLIST.md) | Dinámica de trabajo + pasos tildables del MVP | Saber qué toca ahora o el estado de avance |
+| [`./ARQUITECTURA.md`](./ARQUITECTURA.md) | Distribución del repo (backend/frontend/infra) + mapa de componentes del frontend | Ubicar dónde vive algo o cómo se conectan las patas |
+| [`./COMO_CORRER.md`](./COMO_CORRER.md) | Requisitos + comandos para levantar cada pata + gotchas | Arrancar el proyecto o recordar un comando |
 | [`../README.md`](../README.md) | Presentación del repo, estructura y cómo levantarlo | Onboarding rápido o comandos de arranque |
 | *(avance-fase-N.md)* | *(Notas de avance por fase — se enlazan aquí al crearlas)* | Detalle de lo hecho en una fase concreta |

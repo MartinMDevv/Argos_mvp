@@ -14,7 +14,7 @@
 - [x] **0.1** Esqueleto de carpetas + `.gitignore` + `README` *(hecho + commiteado)*
 - [x] **0.2** `infra/docker-compose.yml` con **TimescaleDB** → contenedor `healthy`, PG 16.14 + TimescaleDB 2.28.3 ✅
 - [x] **0.3** Esqueleto **FastAPI** con endpoint `/health` → responde `{"status":"ok"}` + `/docs` OK ✅
-- [ ] **0.4** Esqueleto **React + Vite + Tailwind** → `localhost:5173` muestra la página de Argos
+- [x] **0.4** Esqueleto **React + Vite + Tailwind** (v8.1 + React 19 + Tailwind v4) → `localhost:5173` muestra la página de Argos con la piel del boceto (nav, panel/mercados, chat isla, tema claro/oscuro) ✅
 - [ ] **0.5** Conexión backend ↔ base de datos verificada (FastAPI le habla a TimescaleDB)
 
 ## FASE 1 — Motor de datos en tiempo real
@@ -50,4 +50,12 @@ Luego seguimos el **roadmap de versiones** (v1.1 → v5.0) del [spec](../../spec
 
 ---
 
-**👉 Estamos aquí:** listos para el **paso 0.4 — esqueleto React + Vite + Tailwind**.
+**👉 Estamos aquí:** 0.4 hecho (frontend con la piel de Argos). Siguiente: **0.5 — conectar backend ↔ TimescaleDB**.
+
+### Cómo levantar el frontend
+```bash
+cd frontend
+npm install     # (solo la 1ª vez)
+npm run dev     # http://localhost:5173
+```
+Diseño de referencia (boceto vivo): la piel salió de una maqueta iterada; el sistema (paleta pavo real teal+oro, Adwaita Sans + JetBrains Mono, estilo Linear) vive en `src/index.css`. **Pendiente:** el logo del pavo real es un placeholder dibujado en SVG → reemplazar por un vector pulido cuando esté.
