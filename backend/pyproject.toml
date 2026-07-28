@@ -6,4 +6,6 @@ requires-python = ">=3.13"
 dependencies = [
     "fastapi>=0.115",      # framework web async
     "uvicorn[standard]>=0.32",  # servidor ASGI que corre la app
+    "asyncpg>=0.30",       # driver async de Postgres/TimescaleDB (con pool propio)
+    "pydantic-settings>=2.6",  # carga la configuración desde el .env y la valida
 ]

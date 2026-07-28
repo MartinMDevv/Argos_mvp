@@ -15,7 +15,11 @@
 - [x] **0.2** `infra/docker-compose.yml` con **TimescaleDB** → contenedor `healthy`, PG 16.14 + TimescaleDB 2.28.3 ✅
 - [x] **0.3** Esqueleto **FastAPI** con endpoint `/health` → responde `{"status":"ok"}` + `/docs` OK ✅
 - [x] **0.4** Esqueleto **React + Vite + Tailwind** (v8.1 + React 19 + Tailwind v4) → `localhost:5173` muestra la página de Argos con la piel del boceto (nav, panel/mercados, chat isla, tema claro/oscuro) ✅
-- [ ] **0.5** Conexión backend ↔ base de datos verificada (FastAPI le habla a TimescaleDB)
+- [x] **0.5** Conexión backend ↔ base de datos verificada → `GET /health/db` responde
+  `{"postgres":"16.14","timescaledb":"2.28.3"}` ✅ *(pool asyncpg + config desde `infra/.env`;
+  con la BD caída devuelve 503 con mensaje claro y se reconecta sola cuando vuelve)*
+
+**🎉 FASE 0 COMPLETA** — las tres patas montadas y el backend hablando con la base de datos.
 
 ## FASE 1 — Motor de datos en tiempo real
 - [ ] **1.1** WebSocket de Binance para BTC/ETH → ticks por consola
@@ -50,7 +54,8 @@ Luego seguimos el **roadmap de versiones** (v1.1 → v5.0) del [spec](../../spec
 
 ---
 
-**👉 Estamos aquí:** 0.4 hecho (frontend con la piel de Argos). Siguiente: **0.5 — conectar backend ↔ TimescaleDB**.
+**👉 Estamos aquí:** **Fase 0 cerrada** (0.1 a 0.5). Siguiente: **1.1 — WebSocket de Binance para BTC/ETH**,
+o sea el primer dato **real** entrando a Argos.
 
 ### Cómo levantar el frontend
 ```bash

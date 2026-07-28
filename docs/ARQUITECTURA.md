@@ -28,8 +28,10 @@ Hoy (Fase 0) las patas están montadas pero aún no conectadas entre sí.
 backend/
 ├── app/
 │   ├── __init__.py
-│   └── main.py          → la app FastAPI; hoy solo expone GET /health
-├── pyproject.toml       → dependencias (fastapi, uvicorn)
+│   ├── config.py        → ajustes y credenciales (leídos de ../infra/.env con pydantic-settings)
+│   ├── db.py            → pool de conexiones a TimescaleDB (asyncpg) + chequeo de conexión
+│   └── main.py          → la app FastAPI; expone GET /health y GET /health/db
+├── pyproject.toml       → dependencias (fastapi, uvicorn, asyncpg, pydantic-settings)
 ├── uv.lock              → lockfile de uv
 └── .python-version      → fija Python 3.13 (NO usar el 3.14 del sistema: faltan wheels)
 ```
@@ -38,7 +40,28 @@ backend/
 - Aquí vivirán, por fases: la **ingesta** (WebSocket de Binance), la **persistencia** en TimescaleDB,
   los **detectores** de alertas (como plugins: agregar = enchufar), las **notificaciones** (Telegram)
   y la **IA** on-demand (Ollama).
-- Estado actual: esqueleto con `/health` que responde `{"status":"ok"}`.
+- Estado actual: esqueleto conectado a la base de datos (paso 0.5).
+
+**Cómo habla el backend con la base de datos** (decidido en el paso 0.5):
+
+- **Driver: `asyncpg` puro**, sin ORM. Motivo: la ingesta de ticks de la Fase 1 es masiva
+  (`copy_records_to_table` es lo más rápido que hay) y el SQL propio de TimescaleDB
+  (hypertables, `time_bucket`) se escribe a mano igual, así que un ORM aportaba poco y agregaba
+  una capa. Las tablas normales (alertas, config) llevan SQL a mano.
+- **Pool de conexiones**: abrir una conexión a Postgres es caro, así que se mantienen varias
+  abiertas y se van prestando. Vive en `db.py` como recurso global del proceso.
+- **Ciclo de vida**: el pool se abre en el `lifespan` de FastAPI al arrancar y se cierra al parar.
+  Si la BD no está disponible al arrancar, la API **igual levanta** y lo reporta en `/health/db`
+  (no revienta el arranque).
+- **Reconexión perezosa** (`asegurar_pool`): como Docker se enciende a mano, es normal levantar el
+  backend antes que la base. Si no hay pool, el siguiente pedido intenta abrirlo — no hace falta
+  reiniciar el backend. La variante estricta (`obtener_pool`, sin reintento) queda para el código
+  caliente de la ingesta, que no debe pagar ese costo en cada tick.
+- **Credenciales**: `config.py` lee el **mismo** `infra/.env` que usa docker-compose — una sola
+  fuente de la contraseña, sin duplicarla. Las variables de entorno reales tienen prioridad sobre
+  el archivo, así que cuando el backend corra dentro de Docker basta con pasarle `POSTGRES_HOST`.
+- **Dos endpoints de salud, a propósito separados**: `/health` (¿vive la API?, no toca la BD) y
+  `/health/db` (¿llega a la BD?, hace `SELECT 1` y devuelve 503 con mensaje claro si no).
 
 ## 🖥️ frontend/ — React 19 + Vite + Tailwind v4 (TypeScript)
 

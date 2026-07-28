@@ -39,8 +39,14 @@ uv run uvicorn app.main:app --reload --port 8000     # arranca la API
 ```
 
 Verificar:
-- http://localhost:8000/health → `{"status":"ok","service":"argos-backend"}`
+- http://localhost:8000/health → `{"status":"ok","service":"argos-backend"}` (la API está viva)
+- http://localhost:8000/health/db → `{"status":"ok", ...}` con las versiones de Postgres y
+  TimescaleDB (la API **llega a la base de datos**)
 - http://localhost:8000/docs → documentación interactiva (Swagger)
+
+> Si `/health/db` devuelve **503** con `"status":"sin_conexion"`, no es un bug: es el aviso de que
+> la base de datos no está arriba. Volvé al paso 1 (`docker-on` + `docker compose up -d --wait`).
+> La API sigue respondiendo `/health` igual — se cae la BD, no Argos entero.
 
 ## 3. Frontend (React + Vite)
 
@@ -65,6 +71,13 @@ npm run preview   # sirve el build de producción para probarlo
 - **Docker no autoarranca**: si algo de la BD falla, revisá que Docker esté encendido (`docker-on`).
 - **Python 3.13**: el backend está fijado a 3.13 con `uv` (el 3.14 del sistema no tiene todos los
   wheels). `uv` lo maneja solo; no uses el Python global.
+- **Si movés o renombrás la carpeta del proyecto, el `.venv` se rompe.** Los entornos virtuales
+  guardan **rutas absolutas** dentro de sus scripts, así que `uvicorn` falla con
+  `Failed to spawn: uvicorn — No such file or directory` aunque el paquete esté instalado.
+  Solución: regenerarlo (es desechable, está en `.gitignore`):
+  ```bash
+  cd backend && rm -rf .venv && uv sync
+  ```
 - **`.env` de infra**: no se sube a git. Si clonás el repo en otra máquina, copiá `.env.example` a
   `.env` y poné la contraseña.
 - **Datos mock en el frontend**: por ahora BTC/ETH muestran números de ejemplo (en `src/data/coins.ts`).

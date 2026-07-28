@@ -33,9 +33,10 @@ Monolito modular, fronteras limpias. Detectores como plugins (agregar = enchufar
 Núcleo agnóstico de usuario (multiusuario/suscripción se añade encima, después).
 
 ## 7. Estado y norte
-Fase 0 (cimientos): 0.1-0.4 hechos (esqueleto + git; TimescaleDB viva; FastAPI /health; frontend
-React+Vite+Tailwind con la piel de Argos); siguiente 0.5 = conectar backend ↔ TimescaleDB. Estado
-tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
+**Fase 0 (cimientos) COMPLETA** (0.1-0.5): esqueleto + git; TimescaleDB viva; frontend
+React+Vite+Tailwind con la piel de Argos; backend FastAPI conectado a la BD (pool **asyncpg**, sin
+ORM; config desde `infra/.env`; `/health` = API viva, `/health/db` = llega a la BD). Siguiente:
+**1.1 = WebSocket de Binance para BTC/ETH** (primer dato real). Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.
 
