@@ -35,8 +35,12 @@ Núcleo agnóstico de usuario (multiusuario/suscripción se añade encima, despu
 ## 7. Estado y norte
 **Fase 0 (cimientos) COMPLETA** (0.1-0.5): esqueleto + git; TimescaleDB viva; frontend
 React+Vite+Tailwind con la piel de Argos; backend FastAPI conectado a la BD (pool **asyncpg**, sin
-ORM; config desde `infra/.env`; `/health` = API viva, `/health/db` = llega a la BD). Siguiente:
-**1.1 = WebSocket de Binance para BTC/ETH** (primer dato real). Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
+ORM; config desde `infra/.env`; `/health` = API viva, `/health/db` = llega a la BD).
+**1.1 HECHO**: ingesta en vivo de Binance (`app/ingesta/binance.py`), stream `aggTrade` de BTC/ETH ->
+modelo `Tick` (`app/modelos.py`, precios en `Decimal`, UTC). El módulo solo escucha y traduce: entrega
+cada tick a un consumidor que recibe por parámetro (en 1.2 ese consumidor será el que escribe en la BD).
+Siguiente: **1.2 = persistir ticks en TimescaleDB** (hypertable + último estado en memoria).
+Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.
 

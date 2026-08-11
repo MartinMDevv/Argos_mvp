@@ -22,7 +22,10 @@
 **🎉 FASE 0 COMPLETA** — las tres patas montadas y el backend hablando con la base de datos.
 
 ## FASE 1 — Motor de datos en tiempo real
-- [ ] **1.1** WebSocket de Binance para BTC/ETH → ticks por consola
+- [x] **1.1** WebSocket de Binance para BTC/ETH → ticks por consola ✅
+  *(`app/ingesta/binance.py` + modelo `Tick` en `app/modelos.py`; stream `aggTrade` combinado,
+  precios en `Decimal`, reconexión con espera creciente. Probar:
+  `cd backend && uv run python -m app.ingesta.binance --limite 20`)*
 - [ ] **1.2** Persistir ticks en TimescaleDB (hypertable) + "último estado" en memoria
 - [ ] **1.3** Armar velas (candles) por agregación + endpoint REST para consultarlas
 - [ ] **1.4** WebSocket del backend que empuja precios en vivo al frontend
@@ -54,8 +57,9 @@ Luego seguimos el **roadmap de versiones** (v1.1 → v5.0) del [spec](../../spec
 
 ---
 
-**👉 Estamos aquí:** **Fase 0 cerrada** (0.1 a 0.5). Siguiente: **1.1 — WebSocket de Binance para BTC/ETH**,
-o sea el primer dato **real** entrando a Argos.
+**👉 Estamos aquí:** **Fase 0 cerrada** (0.1 a 0.5) y **1.1 hecho**: el primer dato **real** ya entra a
+Argos. Siguiente: **1.2 — persistir los ticks en TimescaleDB** (hypertable + último estado en memoria),
+o sea que ese dato deje de ser humo y quede guardado.
 
 ### Cómo levantar el frontend
 ```bash

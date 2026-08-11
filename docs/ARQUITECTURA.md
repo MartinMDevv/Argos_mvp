@@ -30,8 +30,11 @@ backend/
 │   ├── __init__.py
 │   ├── config.py        → ajustes y credenciales (leídos de ../infra/.env con pydantic-settings)
 │   ├── db.py            → pool de conexiones a TimescaleDB (asyncpg) + chequeo de conexión
+│   ├── modelos.py       → modelos de dominio (hoy: Tick). No sabe de exchanges ni de BD
+│   ├── ingesta/
+│   │   └── binance.py   → escucha el WebSocket de Binance y emite Ticks (paso 1.1)
 │   └── main.py          → la app FastAPI; expone GET /health y GET /health/db
-├── pyproject.toml       → dependencias (fastapi, uvicorn, asyncpg, pydantic-settings)
+├── pyproject.toml       → dependencias (fastapi, uvicorn, asyncpg, pydantic-settings, websockets)
 ├── uv.lock              → lockfile de uv
 └── .python-version      → fija Python 3.13 (NO usar el 3.14 del sistema: faltan wheels)
 ```
@@ -62,6 +65,24 @@ backend/
   el archivo, así que cuando el backend corra dentro de Docker basta con pasarle `POSTGRES_HOST`.
 - **Dos endpoints de salud, a propósito separados**: `/health` (¿vive la API?, no toca la BD) y
   `/health/db` (¿llega a la BD?, hace `SELECT 1` y devuelve 503 con mensaje claro si no).
+
+**Cómo entra el dato del mercado** (decidido en el paso 1.1):
+
+- **WebSocket, no sondeo**: la conexión queda abierta y es Binance quien empuja cada operación en el
+  momento en que pasa. Preguntar cada X segundos llega tarde y gasta cuota.
+- **Stream `aggTrade`, no `trade`**: una orden grande se ejecuta contra muchas órdenes chicas del libro
+  y genera decenas de `trade` idénticos; `aggTrade` los junta en un evento. Mismo hecho económico, mucho
+  menos ruido y menos filas que guardar. Los dos símbolos van por **una sola conexión** (stream combinado).
+- **Precios en `Decimal`, nunca `float`**: Binance manda los precios como texto justamente para no perder
+  precisión, y la regla de oro del proyecto es no deformar cifras. `0.1 + 0.2` en float da `0.30000000000000004`.
+- **Tiempos en UTC con zona explícita**, tomados del reloj del exchange (campo `T`), no de cuándo llegó.
+- **Frontera**: `ingesta/binance.py` solo escucha y traduce a `Tick`. No guarda ni decide alertas: le
+  entrega cada tick a un consumidor que recibe por parámetro. Hoy ese consumidor imprime por consola;
+  en 1.2 será el que escribe en TimescaleDB, y el módulo de ingesta no cambia.
+- **Reconexión con espera creciente**: la reconexión automática de `websockets` no espera nada cuando el
+  servidor cierra bien — reintentaría decenas de veces por segundo y Binance banea la IP a las 300
+  conexiones en 5 minutos. Por eso se mide cuánto duró cada conexión: si fue corta, la espera se duplica
+  (1→2→4…60 s); si aguantó más de un minuto, se considera sana y la espera se resetea.
 
 ## 🖥️ frontend/ — React 19 + Vite + Tailwind v4 (TypeScript)
 

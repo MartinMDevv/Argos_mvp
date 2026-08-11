@@ -48,6 +48,20 @@ Verificar:
 > la base de datos no está arriba. Volvé al paso 1 (`docker-on` + `docker compose up -d --wait`).
 > La API sigue respondiendo `/health` igual — se cae la BD, no Argos entero.
 
+### Ver el mercado en vivo por consola (paso 1.1)
+
+La ingesta todavía no está enchufada a la API: se prueba sola. **No necesita Docker ni base de datos**,
+solo internet.
+
+```bash
+cd backend
+uv run python -m app.ingesta.binance --limite 20     # muestra 20 operaciones reales y corta
+uv run python -m app.ingesta.binance                 # sin límite; cortar con Ctrl+C
+```
+
+Deberías ver una línea por operación con hora, par, precio, cantidad, cuánto dinero movió y si mandó
+la compra (▲) o la venta (▼). Si no sale nada, revisá la conexión a internet.
+
 ## 3. Frontend (React + Vite)
 
 ```bash
