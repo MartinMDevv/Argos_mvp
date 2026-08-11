@@ -18,7 +18,8 @@ Argos_MVP/
 El **flujo de datos** (cuando esté todo conectado): un exchange (Binance) → el **backend** ingiere
 y guarda en **TimescaleDB** (infra) → los **detectores** miran esos datos y generan alertas → el
 **frontend** consume la API/WebSocket y muestra todo → la **IA local** (Ollama) explica en palabras.
-Hoy (Fase 0) las patas están montadas pero aún no conectadas entre sí.
+Hoy (Fase 1 completa) el tramo Binance → backend → TimescaleDB → velas → WebSocket funciona de punta a
+punta. Falta que el frontend lo consuma: todavía muestra datos mock.
 
 ---
 
@@ -33,6 +34,7 @@ backend/
 │   ├── esquema.py       → aplica los .sql de sql/ al arrancar (idempotente)
 │   ├── estado.py        → EstadoMercado: último tick de cada símbolo, en memoria
 │   ├── velas.py         → arma velas OHLCV con time_bucket de TimescaleDB (paso 1.3)
+│   ├── difusion.py      → empuja el estado a los paneles conectados por WS (paso 1.4)
 │   ├── modelos.py       → modelos de dominio (hoy: Tick). No sabe de exchanges ni de BD
 │   ├── ingesta/
 │   │   ├── binance.py   → escucha el WebSocket de Binance y emite Ticks (paso 1.1)
@@ -146,6 +148,28 @@ Cada tick que entra va a **dos lugares distintos, con propósitos distintos**:
   refrescan solas).
 - **Argos solo tiene lo que vio**: no hay historia anterior al primer arranque y no se inventa. Traer
   historia vieja desde la API REST de Binance (backfill) es un paso posterior.
+
+**Cómo llega el dato al panel** (decidido en el paso 1.4):
+
+Hasta acá el panel tenía que *preguntar*. Con `WS /ws/mercado` se da vuelta: se conecta una vez y el
+backend le **avisa**. Es el mismo trato que tenemos con Binance, un escalón más arriba.
+
+- **No se manda cada tick.** Por lo mismo que elegimos `aggTrade`: bajo ruido. BTC y ETH generan decenas
+  de operaciones por segundo y ni el ojo humano ni React sacan provecho de redibujar 40 veces por segundo.
+  Se manda una foto cada 0,5 s **y solo si cambió algo** (medido: ~1,6 mensajes/s en vez de ~40).
+- **Foto completa al conectarse** (`bienvenida`): sin eso el panel arrancaría en blanco hasta la primera
+  novedad, y parecería que Argos no sabe nada cuando en realidad sí sabe.
+- **Latido cada 15 s sin novedades**: una conexión muda es indistinguible de una muerta. El `latido` le
+  dice al panel que Argos sigue mirando.
+- **Envíos en paralelo** (`asyncio.gather`): si fueran secuenciales, un panel lento —una pestaña en
+  segundo plano, una conexión mala— haría esperar a todos. Al que falla se lo da de baja en el momento.
+- **Hay que seguir leyendo del socket** aunque el panel no mande nada: es la única forma de enterarse de
+  que cerró. Sin ese `receive`, un panel que se fue quedaría en la lista para siempre.
+- **Tipos de mensaje explícitos** (`bienvenida` / `estado` / `latido`): el cliente decide mirando `tipo`,
+  sin adivinar por la forma del contenido.
+- **CORS**: el navegador bloquea pedidos entre orígenes distintos, y el frontend vive en el 5173 mientras
+  la API está en el 8000. Se autorizan solo los orígenes de desarrollo — nunca `"*"`, que abriría la API
+  a cualquier página.
 
 ## 🖥️ frontend/ — React 19 + Vite + Tailwind v4 (TypeScript)
 

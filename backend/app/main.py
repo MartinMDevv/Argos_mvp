@@ -5,11 +5,12 @@ Signos vitales:
     GET /health/db        → ¿la API llega a la BD?       (hace una consulta real)
 
 Mercado:
-    GET /mercado/estado   → último precio de cada símbolo + salud de la ingesta   (paso 1.2)
-    GET /mercado/velas    → velas OHLCV para dibujar el gráfico                   (paso 1.3)
+    GET  /mercado/estado  → último precio de cada símbolo + salud de la ingesta   (paso 1.2)
+    GET  /mercado/velas   → velas OHLCV para dibujar el gráfico                   (paso 1.3)
+    WS   /ws/mercado      → el backend EMPUJA los precios en vivo                 (paso 1.4)
 
-Desde el paso 1.2, al arrancar la API se encienden además dos tareas de fondo que corren
-para siempre: una escucha Binance y otra va guardando lo que llega en TimescaleDB.
+Desde el paso 1.2, al arrancar la API se encienden tareas de fondo que corren para siempre:
+escuchar Binance, guardar en TimescaleDB y (desde 1.4) difundir a los paneles conectados.
 """
 
 import asyncio
@@ -19,11 +20,13 @@ from contextlib import asynccontextmanager
 from datetime import datetime
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
 from app.config import obtener_settings
 from app.db import abrir_pool, cerrar_pool, revisar_conexion
+from app.difusion import GestorDeConexiones, emitir_estado
 from app.esquema import aplicar_esquema
 from app.estado import EstadoMercado
 from app.ingesta.almacen import EscritorDeTicks
@@ -37,6 +40,7 @@ logger = logging.getLogger(__name__)
 # Estado vivo del proceso. Se arma en el `lifespan` y lo leen los endpoints.
 estado_mercado = EstadoMercado()
 escritor_de_ticks = EscritorDeTicks()
+gestor_de_paneles = GestorDeConexiones()
 
 
 @asynccontextmanager
@@ -75,6 +79,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     else:
         logger.info("Ingesta desactivada (INGESTA_ACTIVA=false)")
 
+    # La difusión se enciende igual, haya ingesta o no: si no hay novedades simplemente no
+    # manda nada, y así un panel conectado no se queda esperando un socket que nunca abrió.
+    tareas.append(
+        asyncio.create_task(
+            emitir_estado(gestor_de_paneles, estado_mercado), name="difusion-paneles"
+        )
+    )
+
     yield
 
     # --- Apagado ---
@@ -84,7 +96,7 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     # Último volcado: lo que quedó en la cola se guarda antes de cerrar el pool.
     # Va después de cancelar las tareas para que nadie siga encolando mientras escribimos.
-    if tareas:
+    if settings.ingesta_activa:
         try:
             guardados = await escritor_de_ticks.volcar()
             if guardados:
@@ -95,7 +107,21 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await cerrar_pool()
 
 
-app = FastAPI(title="Argos API", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Argos API", version="0.3.0", lifespan=lifespan)
+
+# El navegador bloquea los pedidos entre orígenes distintos salvo que el servidor los autorice,
+# y el frontend vive en otro puerto (5173) que la API (8000). Sin esto, el panel recibiría un
+# error de CORS al pedir /mercado/velas. Se listan solo los orígenes de desarrollo: cuando haya
+# un dominio real, se agrega acá (nunca "*", que abriría la API a cualquier página).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[
+        "http://localhost:5173",
+        "http://127.0.0.1:5173",
+    ],
+    allow_methods=["GET"],
+    allow_headers=["*"],
+)
 
 
 @app.get("/health")
@@ -212,3 +238,31 @@ async def mercado_velas(
             "velas": [vela_a_json(vela) for vela in velas],
         }
     )
+
+
+@app.websocket("/ws/mercado")
+async def ws_mercado(websocket: WebSocket) -> None:
+    """Canal en vivo: el panel se conecta una vez y Argos le va empujando los precios.
+
+    Mensajes que manda el servidor (mirar siempre el campo `tipo`):
+
+        {"tipo": "bienvenida", "momento": ..., "simbolos": {...}}  ← al conectarse
+        {"tipo": "estado",     "momento": ..., "simbolos": {...}}  ← cuando algo cambió
+        {"tipo": "latido",     "momento": ...}                     ← "sigo acá", sin novedades
+
+    El cliente no necesita mandar nada. Si manda, se ignora.
+    """
+    await gestor_de_paneles.conectar(websocket, estado_mercado)
+
+    try:
+        # No esperamos mensajes del panel, pero hay que quedarse leyendo igual: es la forma de
+        # enterarse de que cerró la conexión. Sin este `receive`, un panel que se va quedaría
+        # en la lista para siempre y le seguiríamos escribiendo al vacío.
+        while True:
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        pass
+    except Exception as error:
+        logger.debug("Conexión de panel terminada con error: %s", error)
+    finally:
+        gestor_de_paneles.desconectar(websocket)

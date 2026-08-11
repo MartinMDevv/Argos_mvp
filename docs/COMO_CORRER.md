@@ -3,8 +3,8 @@
 > Guía para levantar el proyecto de cero. Para entender qué es cada carpeta, ver
 > [`./ARQUITECTURA.md`](./ARQUITECTURA.md).
 
-Argos tiene **tres patas** que se levantan por separado. Hoy (Fase 0) cada una corre sola; todavía
-no están conectadas entre sí. El orden recomendado es: **infra → backend → frontend**.
+Argos tiene **tres patas** que se levantan por separado. El backend ya usa la base de datos y sirve
+datos reales; el frontend todavía muestra mock. El orden recomendado es: **infra → backend → frontend**.
 
 ## Requisitos
 
@@ -46,6 +46,18 @@ Verificar:
   ingesta (`guardados` tiene que subir; `en_espera` tiene que mantenerse bajo)
 - http://localhost:8000/mercado/velas?simbolo=BTCUSDT&intervalo=1m&limite=20 → velas OHLCV
   (intervalos: `1m`, `5m`, `15m`, `1h`, `4h`, `1d`)
+- `ws://localhost:8000/ws/mercado` → canal en vivo. Para probarlo sin frontend:
+  ```bash
+  uv run python -c "
+  import asyncio, json
+  from websockets.asyncio.client import connect
+  async def main():
+      async with connect('ws://localhost:8000/ws/mercado') as ws:
+          for _ in range(10):
+              m = json.loads(await ws.recv())
+              print(m['tipo'], m.get('simbolos', ''))
+  asyncio.run(main())"
+  ```
 - http://localhost:8000/docs → documentación interactiva (Swagger)
 
 > **Desde el paso 1.2 la API se conecta sola a Binance al arrancar** y empieza a guardar ticks.

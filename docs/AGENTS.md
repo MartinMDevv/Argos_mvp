@@ -52,7 +52,13 @@ manda operaciones con el mismo milisegundo y el desempate por tiempo hacía el c
 las velas); (b) una vela se marca `completa` recién 5 s después de cerrar el tramo (`MARGEN_ASENTADO`), porque
 el escritor vuelca de a lotes cada 2 s y si no la bandera mentiría en el borde. Verificado contra las velas
 oficiales de Binance: idénticas al octavo decimal. Argos NO tiene historia anterior a su primer arranque
-(backfill = fase futura). Siguiente: **1.4 = WebSocket propio que empuja precios al frontend**.
+(backfill = fase futura).
+**1.4 HECHO → FASE 1 COMPLETA**: `app/difusion.py` + `WS /ws/mercado`. El panel se conecta y el backend le
+empuja: `bienvenida` (foto al conectarse), `estado` (cuando cambia algo, máximo cada 0,5 s) y `latido`
+(cada 15 s de silencio, para distinguir conexión viva de conexión muerta). NO se manda cada tick: bajo
+ruido, ~1,6 msg/s en vez de ~40. Envíos en paralelo para que un panel lento no frene a los demás. CORS
+solo para los orígenes de desarrollo (nunca `*`). Siguiente: **2.1 = gráfico de velas en vivo en el
+frontend** (reemplazar el mock de `src/data/coins.ts`).
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.

@@ -34,7 +34,13 @@
   *(`app/velas.py` con `time_bucket` + `first`/`last` de Timescale; intervalos 1m/5m/15m/1h/4h/1d.
   `GET /mercado/velas?simbolo=BTCUSDT&intervalo=1m&limite=200`. Verificado contra las velas
   oficiales de Binance: idénticas hasta el octavo decimal)*
-- [ ] **1.4** WebSocket del backend que empuja precios en vivo al frontend
+- [x] **1.4** WebSocket del backend que empuja precios en vivo al frontend ✅
+  *(`app/difusion.py`; `WS /ws/mercado` manda `bienvenida` al conectarse, `estado` cuando cambia algo
+  —cada 0,5 s como mucho— y `latido` cada 15 s de silencio. Soporta varios paneles a la vez. CORS
+  habilitado para localhost:5173)*
+
+**🎉 FASE 1 COMPLETA** — el motor de datos en tiempo real anda de punta a punta: Binance → ticks →
+TimescaleDB → velas → empujado al panel.
 
 ## FASE 2 — Dashboard base
 - [ ] **2.1** Gráfico de velas (lightweight-charts) actualizándose en vivo
@@ -63,10 +69,9 @@ Luego seguimos el **roadmap de versiones** (v1.1 → v5.0) del [spec](../../spec
 
 ---
 
-**👉 Estamos aquí:** **Fase 0 cerrada** (0.1 a 0.5) y **1.1, 1.2 y 1.3 hechos**: el dato real entra,
-queda guardado, y ya se puede pedir en forma de velas listas para dibujar. Siguiente:
-**1.4 — WebSocket propio del backend que empuja los precios al frontend**, para que el panel deje de
-preguntar y pase a recibir.
+**👉 Estamos aquí:** **Fases 0 y 1 cerradas.** El backend ve el mercado, lo guarda, lo resume en velas
+y lo empuja en vivo. Lo que falta es que el panel lo muestre: siguiente **2.1 — gráfico de velas
+(lightweight-charts) actualizándose en vivo**, reemplazando el mock de `src/data/coins.ts`.
 
 ### Cómo levantar el frontend
 ```bash
