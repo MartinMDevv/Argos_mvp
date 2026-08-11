@@ -19,7 +19,8 @@ El **flujo de datos** (cuando esté todo conectado): un exchange (Binance) → e
 y guarda en **TimescaleDB** (infra) → los **detectores** miran esos datos y generan alertas → el
 **frontend** consume la API/WebSocket y muestra todo → la **IA local** (Ollama) explica en palabras.
 Hoy (Fase 1 completa) el tramo Binance → backend → TimescaleDB → velas → WebSocket funciona de punta a
-punta. Falta que el frontend lo consuma: todavía muestra datos mock.
+punta, y el **gráfico de velas del panel ya lo consume en vivo** (paso 2.1). Siguen en mock la
+watchlist, la tabla de mercados y el sidebar → paso 2.2.
 
 ---
 
@@ -185,8 +186,10 @@ frontend/
     ├── App.tsx              → estado global: vista, chat abierto, activos fijados, tema
     ├── index.css            → SISTEMA DE DISEÑO: tokens (ambos temas), @font-face, estilos de componentes
     ├── data/
-    │   └── coins.ts         → datos mock BTC/ETH + serie de velas (luego vienen del backend)
+    │   └── coins.ts         → datos mock BTC/ETH (los usan aún watchlist/tabla/sidebar → paso 2.2)
     ├── lib/
+    │   ├── api.ts           → puente REST: URL del backend, tipos de la API, obtenerVelas() (2.1)
+    │   ├── mercado.tsx      → ProveedorMercado: LA conexión WebSocket + hooks para leerla (2.1)
     │   └── useTheme.ts      → hook de tema claro/oscuro (escribe data-theme en <html>)
     ├── assets/fonts/        → Adwaita Sans + JetBrains Mono (subseteadas, .woff2)
     └── components/
@@ -198,7 +201,7 @@ frontend/
         ├── Watchlist.tsx       → favoritos con logo, sparkline y pin
         ├── PulseCard.tsx       → StatusBar (banner + radar) y PulseCard ("Lo que Argos vio")
         ├── MarketTable.tsx     → tabla densa de activos vigilados
-        ├── CandleChart.tsx     → gráfico de velas en canvas + crosshair
+        ├── CandleChart.tsx     → gráfico de velas con lightweight-charts y DATOS REALES (2.1)
         ├── PriceVolChart.tsx   → precio (área) + histograma de volumen en canvas
         ├── Peacock.tsx         → logo pavo real (SVG generado; PLACEHOLDER)
         ├── CoinLogo.tsx        → logos oficiales BTC/ETH
@@ -219,9 +222,39 @@ frontend/
 **Convenciones del frontend:**
 - Import con alias `@` → `src` (ej. `import { COINS } from '@/data/coins'`).
 - Comentarios en español.
-- Los datos son **mock** por ahora; el contrato con el backend se define en Fase 1–2.
+- El **gráfico ya usa datos reales** (2.1). Siguen en mock la watchlist, la tabla y el sidebar → paso 2.2.
 - ⚠️ El **logo del pavo real** (`Peacock.tsx`) es un placeholder dibujado en SVG a mano →
   reemplazar por un vector pulido cuando esté.
+
+**Cómo llegan los datos al gráfico** (decidido en el paso 2.1):
+
+- **Dos fuentes, cada una en lo que es buena.** REST (`/mercado/velas`) da la **historia y la verdad**:
+  la base agrupa los ticks y devuelve máximo, mínimo y volumen exactos. El WebSocket (`/ws/mercado`) da
+  el **ahora**: el último precio, cada 0,5 s. El WebSocket no manda velas, manda precios sueltos, así
+  que la vela en curso se arma en el navegador.
+- **Y aun así se le sigue preguntando a la base.** La foto del WebSocket viaja cada 0,5 s y solo si
+  cambió algo: entre dos fotos puede haber habido un pico que no vimos. Quedarnos solo con eso daría
+  "el máximo de lo que alcanzamos a mirar", que no es el máximo real. Cada `RECONCILIACION_MS` (10 s) se
+  vuelven a pedir las últimas velas y se corrige. La vela en curso es la **unión** de las dos fuentes:
+  de la base lo que ya aterrizó en disco, del WebSocket los últimos segundos que aún no llegaron —
+  el máximo y el mínimo se toman con `Math.max`/`Math.min`, así ninguna fuente puede achicar a la otra.
+- **UNA sola conexión para toda la app.** `ProveedorMercado` va en `main.tsx`, arriba de `<App/>`. Si cada
+  componente abriera su socket habría uno por gráfico, otro por tabla, y todos se caerían al cambiar de
+  vista (React desmonta lo que deja de mostrar).
+- **Reconexión con espera creciente, igual que con Binance** (paso 1.1): 1 s → 2 s → … → 30 s, y la espera
+  se resetea si la conexión duró más de un minuto. La lección se repite un escalón más abajo.
+- **Los precios viajan como texto y se convierten a número lo más tarde posible**, solo al dibujar. El
+  `Number()` vive en una función (`aVela`) y en ningún otro lado: el string sigue siendo la fuente de verdad.
+- **El bucket se calcula igual que en la base**: `Math.floor(momento / ancho) * ancho`. Es lo mismo que hace
+  `time_bucket()` (ambos alinean contra el epoch), y por eso las velas de las dos fuentes caen siempre en
+  el mismo casillero.
+- **Se guarda y se devuelve el encuadre** al reconciliar (`getVisibleLogicalRange` / `setVisibleLogicalRange`):
+  sin eso, cada corrección le arrebataría el zoom al usuario cada 10 segundos.
+- **Si no hay datos, se dice.** Cargando, sin conexión, o "Argos todavía no vio operaciones de X" — nunca un
+  precio en cero, que en un gráfico se vería como un desplome que no ocurrió.
+- **Las velas viven en un `ref`, no en estado**: cambian varias veces por segundo y no queremos un render de
+  React por cada una — el gráfico se actualiza solo, por su propia API. Lo único que va a estado es *si hay
+  o no hay* velas, porque eso sí decide qué se muestra.
 
 ## 🗄️ infra/ — Docker Compose (TimescaleDB)
 

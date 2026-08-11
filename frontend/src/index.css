@@ -129,6 +129,22 @@
   .panel h3{margin:0; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); font-weight:700;}
   .panel .fig{position:absolute; top:12px; right:13px;}
   canvas{width:100%; display:block; border-radius:6px;}
+
+  /* Gráfico de velas (lightweight-charts). El contenedor manda el tamaño; la librería dibuja
+     dentro con medidas propias en línea, así que la regla de arriba no la estorba — salvo el
+     redondeo, que sí hay que desactivar o recorta las velas del borde. */
+  .chart-lw{position:relative; margin-top:10px;}
+  .chart-lw canvas{border-radius:0;}
+  /* Aviso honesto cuando no hay nada que mostrar: cargando, sin datos o sin backend. */
+  .chart-aviso{position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
+    font-family:var(--mono); font-size:10.5px; color:var(--faint); text-align:center; padding:0 16px;
+    background:color-mix(in srgb,var(--surface) 72%, transparent); border-radius:6px; pointer-events:none;}
+  /* Si SÍ hay velas pero se cortó la conexión, no tapamos el gráfico: basta un sello que avise
+     que lo que se ve quedó congelado. */
+  .chart-frio{position:absolute; top:6px; left:8px; z-index:2; pointer-events:none;
+    font-family:var(--mono); font-size:9px; letter-spacing:.08em; text-transform:uppercase;
+    color:var(--gold); background:color-mix(in srgb,var(--gold) 14%, var(--surface));
+    border:1px solid var(--gold-dim); border-radius:999px; padding:2px 7px;}
   .row2{display:grid; grid-template-columns:1fr 1fr; gap:12px;}
   .row2 > .panel{min-width:0;}  /* fuerza 50/50 real: ningún panel se roba el ancho del otro */
   @media (max-width:720px){ .row2{grid-template-columns:1fr;} }

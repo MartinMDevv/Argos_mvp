@@ -43,8 +43,13 @@
 TimescaleDB → velas → empujado al panel.
 
 ## FASE 2 — Dashboard base
-- [ ] **2.1** Gráfico de velas (lightweight-charts) actualizándose en vivo
-- [ ] **2.2** Watchlist BTC/ETH + panel de estado (precio, cambio %)
+- [x] **2.1** Gráfico de velas (lightweight-charts) actualizándose en vivo ✅
+  *(`src/lib/api.ts` = puente REST; `src/lib/mercado.tsx` = LA conexión WebSocket de toda la app;
+  `CandleChart.tsx` reescrito con lightweight-charts v5. La historia sale de `/mercado/velas` y el
+  WebSocket mueve la vela en curso; cada 10 s se le vuelve a preguntar a la base para corregir el
+  máximo/mínimo, porque entre dos fotos del WebSocket puede haberse escapado un pico)*
+- [ ] **2.2** Watchlist BTC/ETH + panel de estado (precio, cambio %) *(y selector de moneda/intervalo:
+  el gráfico está fijo en BTCUSDT · 1m)*
 
 ## FASE 3 — Detectores de alertas (el corazón)
 - [ ] **3.1** Framework de detectores (clase base + registro de plugins)
@@ -69,9 +74,10 @@ Luego seguimos el **roadmap de versiones** (v1.1 → v5.0) del [spec](../../spec
 
 ---
 
-**👉 Estamos aquí:** **Fases 0 y 1 cerradas.** El backend ve el mercado, lo guarda, lo resume en velas
-y lo empuja en vivo. Lo que falta es que el panel lo muestre: siguiente **2.1 — gráfico de velas
-(lightweight-charts) actualizándose en vivo**, reemplazando el mock de `src/data/coins.ts`.
+**👉 Estamos aquí:** **Fases 0 y 1 cerradas + 2.1 hecho.** El backend ve el mercado, lo guarda, lo
+resume en velas y lo empuja en vivo — y el gráfico del Panel ya lo dibuja con datos reales, moviéndose
+solo. Siguiente: **2.2 — watchlist y panel de estado con datos reales** (precio y cambio %), más el
+selector de moneda e intervalo, que jubila lo que queda de `src/data/coins.ts`.
 
 ### Cómo levantar el frontend
 ```bash

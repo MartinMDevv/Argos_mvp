@@ -3,8 +3,10 @@
 > Guía para levantar el proyecto de cero. Para entender qué es cada carpeta, ver
 > [`./ARQUITECTURA.md`](./ARQUITECTURA.md).
 
-Argos tiene **tres patas** que se levantan por separado. El backend ya usa la base de datos y sirve
-datos reales; el frontend todavía muestra mock. El orden recomendado es: **infra → backend → frontend**.
+Argos tiene **tres patas** que se levantan por separado. El backend usa la base de datos y sirve datos
+reales, y desde el paso 2.1 el **gráfico del panel los consume en vivo** (el resto del panel sigue en
+mock). El orden recomendado es: **infra → backend → frontend**, y ahora importa de verdad: sin backend,
+el gráfico avisa que no hay conexión en vez de dibujar.
 
 ## Requisitos
 
@@ -101,11 +103,26 @@ npm run dev     # arranca el servidor de desarrollo
 
 Abrir **http://localhost:5173** → deberías ver el panel de Argos (nav, gráfico, favoritos, chat).
 
+**Con el backend arriba**, el gráfico del Panel muestra velas reales de BTCUSDT y se mueve solo. Para
+comprobar que está vivo de verdad y no es una imagen: dejalo un minuto y mirá cómo la última vela cambia
+de alto y de color, y cómo al cambiar de minuto nace una nueva.
+
+Si el backend está apagado, el gráfico lo dice (`Sin conexión` / `Argos todavía no vio operaciones`)
+en vez de inventar precios.
+
 Otros comandos útiles del frontend:
 ```bash
 npm run build     # compila para producción (typecheck + bundle en dist/)
 npm run preview   # sirve el build de producción para probarlo
+npx tsc -b        # solo el chequeo de tipos, sin compilar
 ```
+
+> **¿El backend no está en `localhost:8000`?** Se cambia sin tocar código, con un `.env` en `frontend/`:
+> ```
+> VITE_API_URL=http://192.168.1.50:8000
+> ```
+> La dirección del WebSocket sale sola de ahí (`http://` → `ws://`). Ojo: el backend solo autoriza por
+> CORS los orígenes de desarrollo, así que si movés el frontend hay que agregarlo en `app/main.py`.
 
 ---
 
@@ -123,8 +140,11 @@ npm run preview   # sirve el build de producción para probarlo
   ```
 - **`.env` de infra**: no se sube a git. Si clonás el repo en otra máquina, copiá `.env.example` a
   `.env` y poné la contraseña.
-- **Datos mock en el frontend**: por ahora BTC/ETH muestran números de ejemplo (en `src/data/coins.ts`).
-  El backend ya tiene datos reales (`/mercado/estado`); se enchufan al panel en la Fase 2.
+- **Todavía queda mock en el frontend**: el **gráfico** ya usa datos reales (2.1), pero la watchlist, la
+  tabla de mercados y el sidebar siguen con los números de ejemplo de `src/data/coins.ts`. Se enchufan
+  en el paso 2.2.
+- **El gráfico arranca casi vacío si Argos se encendió recién**: solo puede dibujar lo que vio. Dale unos
+  minutos, o mirá un intervalo corto (`1m`).
 - **`en_espera` que no baja** en `/mercado/estado` significa que la ingesta anda pero la base no está
   recibiendo. Revisá `/health/db`. Los ticks no se pierden mientras tanto (hay 20.000 de colchón).
 - **Pocas velas al principio, y con huecos**: Argos solo tiene lo que vio desde que lo encendiste, y
