@@ -30,10 +30,15 @@ backend/
 │   ├── __init__.py
 │   ├── config.py        → ajustes y credenciales (leídos de ../infra/.env con pydantic-settings)
 │   ├── db.py            → pool de conexiones a TimescaleDB (asyncpg) + chequeo de conexión
+│   ├── esquema.py       → aplica los .sql de sql/ al arrancar (idempotente)
+│   ├── estado.py        → EstadoMercado: último tick de cada símbolo, en memoria
 │   ├── modelos.py       → modelos de dominio (hoy: Tick). No sabe de exchanges ni de BD
 │   ├── ingesta/
-│   │   └── binance.py   → escucha el WebSocket de Binance y emite Ticks (paso 1.1)
-│   └── main.py          → la app FastAPI; expone GET /health y GET /health/db
+│   │   ├── binance.py   → escucha el WebSocket de Binance y emite Ticks (paso 1.1)
+│   │   └── almacen.py   → EscritorDeTicks: junta ticks y los guarda por lotes (paso 1.2)
+│   └── main.py          → la app FastAPI; endpoints + arranque de las tareas de fondo
+├── sql/
+│   └── 001_ticks.sql    → tabla `ticks` como hypertable + índices
 ├── pyproject.toml       → dependencias (fastapi, uvicorn, asyncpg, pydantic-settings, websockets)
 ├── uv.lock              → lockfile de uv
 └── .python-version      → fija Python 3.13 (NO usar el 3.14 del sistema: faltan wheels)
@@ -83,6 +88,39 @@ backend/
   servidor cierra bien — reintentaría decenas de veces por segundo y Binance banea la IP a las 300
   conexiones en 5 minutos. Por eso se mide cuánto duró cada conexión: si fue corta, la espera se duplica
   (1→2→4…60 s); si aguantó más de un minuto, se considera sana y la espera se resetea.
+
+**Dónde queda ese dato** (decidido en el paso 1.2):
+
+Cada tick que entra va a **dos lugares distintos, con propósitos distintos**:
+
+| Destino | Qué guarda | Para qué |
+|---|---|---|
+| `estado.py` (memoria) | El **ahora**: último tick de cada símbolo | Responder al instante "¿a cuánto está BTC?" |
+| `ticks` en TimescaleDB (disco) | La **historia**: todas las operaciones | Tener con qué comparar y decidir si el ahora es raro |
+
+- **Tabla `ticks` como hypertable**: por fuera es una tabla normal; por dentro Timescale la parte en
+  trozos por rango de tiempo, así una consulta de "la última hora" toca un trozo y no millones de filas.
+  **Sin `id SERIAL`**: en series temporales el eje es el tiempo, y una clave autonumérica sería un índice
+  enorme que nunca se consulta.
+- **`NUMERIC`, no `DOUBLE PRECISION`**: misma razón que el `Decimal` de la ingesta. asyncpg convierte
+  `NUMERIC ↔ Decimal` solo, así que la precisión viaja intacta de Binance al disco.
+- **Escritura por lotes** (`almacen.py`): se juntan ticks en memoria y se vuelcan cuando hay 200 o cuando
+  pasan 2 segundos, lo que ocurra primero. Un viaje a la base en vez de doscientos.
+- **`executemany` y no `copy_records_to_table`** — *esto corrige lo anotado en el paso 0.5*. COPY es más
+  rápido pero **no admite `ON CONFLICT DO NOTHING`**, y la deduplicación no es negociable: al reconectar
+  el WebSocket podemos recibir operaciones ya guardadas, y un tick contado dos veces le miente a los
+  detectores de volumen. Con el volumen del MVP `executemany` sobra. Si crece (memecoins, muchos pares),
+  la salida es COPY a tabla temporal + `INSERT ... SELECT ... ON CONFLICT DO NOTHING`.
+- **Anti-duplicados en la base, no en el código**: índice único `(simbolo, id_operacion, momento)` +
+  `ON CONFLICT DO NOTHING`. Incluye `momento` porque Timescale exige que todo índice único contenga la
+  columna de particionado.
+- **Si la base se cae, Argos no**: los ticks se acumulan en memoria y se reintentan solos cuando vuelve
+  (reconexión perezosa del pool). La cola tiene tope (20.000): si la base no vuelve nunca, se descartan
+  los ticks **más viejos** antes que agotar la RAM. El endpoint `/mercado/estado` muestra ese pulso
+  (`guardados`, `en_espera`, `descartados`).
+- **Esquema idempotente**: los `.sql` de `backend/sql/` se aplican enteros en cada arranque (`IF NOT
+  EXISTS`). Alcanza mientras solo *creemos* cosas; el día que haya que *cambiar* algo ya creado, hará
+  falta control de migraciones de verdad.
 
 ## 🖥️ frontend/ — React 19 + Vite + Tailwind v4 (TypeScript)
 

@@ -26,7 +26,10 @@
   *(`app/ingesta/binance.py` + modelo `Tick` en `app/modelos.py`; stream `aggTrade` combinado,
   precios en `Decimal`, reconexión con espera creciente. Probar:
   `cd backend && uv run python -m app.ingesta.binance --limite 20`)*
-- [ ] **1.2** Persistir ticks en TimescaleDB (hypertable) + "último estado" en memoria
+- [x] **1.2** Persistir ticks en TimescaleDB (hypertable) + "último estado" en memoria ✅
+  *(tabla `ticks` en `sql/001_ticks.sql`; escritura por lotes en `app/ingesta/almacen.py`;
+  memoria en `app/estado.py`; la ingesta arranca con la API. Ver: `GET /mercado/estado`.
+  Aguanta que se caiga la base: los ticks esperan y entran solos cuando vuelve)*
 - [ ] **1.3** Armar velas (candles) por agregación + endpoint REST para consultarlas
 - [ ] **1.4** WebSocket del backend que empuja precios en vivo al frontend
 
@@ -57,9 +60,10 @@ Luego seguimos el **roadmap de versiones** (v1.1 → v5.0) del [spec](../../spec
 
 ---
 
-**👉 Estamos aquí:** **Fase 0 cerrada** (0.1 a 0.5) y **1.1 hecho**: el primer dato **real** ya entra a
-Argos. Siguiente: **1.2 — persistir los ticks en TimescaleDB** (hypertable + último estado en memoria),
-o sea que ese dato deje de ser humo y quede guardado.
+**👉 Estamos aquí:** **Fase 0 cerrada** (0.1 a 0.5), **1.1 y 1.2 hechos**: el dato real del mercado entra
+y **queda guardado** en TimescaleDB, con el precio del momento disponible al instante en memoria.
+Siguiente: **1.3 — armar velas por agregación + endpoint REST**, o sea convertir el chorro de ticks en
+algo que un gráfico pueda dibujar.
 
 ### Cómo levantar el frontend
 ```bash

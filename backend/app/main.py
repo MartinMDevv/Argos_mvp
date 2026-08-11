@@ -1,15 +1,17 @@
 """Punto de entrada de la API de Argos (FastAPI).
 
-Hoy expone dos "signos vitales":
-    GET /health      → ¿está viva la API?           (no toca la base de datos)
-    GET /health/db   → ¿la API llega a la BD?       (hace una consulta real)
+Signos vitales:
+    GET /health           → ¿está viva la API?           (no toca la base de datos)
+    GET /health/db        → ¿la API llega a la BD?       (hace una consulta real)
 
-Están separados a propósito: si la base de datos se cae, Argos sigue respondiendo
-"estoy vivo pero sin BD" en vez de morirse entero.
+Mercado (paso 1.2):
+    GET /mercado/estado   → último precio de cada símbolo + salud de la ingesta
 
-La lógica real —ingesta, detectores, IA— se irá agregando en fases siguientes.
+Desde el paso 1.2, al arrancar la API se encienden además dos tareas de fondo que corren
+para siempre: una escucha Binance y otra va guardando lo que llega en TimescaleDB.
 """
 
+import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
@@ -17,10 +19,20 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 
+from app.config import obtener_settings
 from app.db import abrir_pool, cerrar_pool, revisar_conexion
+from app.esquema import aplicar_esquema
+from app.estado import EstadoMercado
+from app.ingesta.almacen import EscritorDeTicks
+from app.ingesta.binance import escuchar_ticks
+from app.modelos import Tick
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Estado vivo del proceso. Se arma en el `lifespan` y lo leen los endpoints.
+estado_mercado = EstadoMercado()
+escritor_de_ticks = EscritorDeTicks()
 
 
 @asynccontextmanager
@@ -29,21 +41,57 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
 
     Todo lo que está ANTES del `yield` corre al arrancar; lo de DESPUÉS, al parar.
     """
+    settings = obtener_settings()
+
     # --- Arranque ---
     try:
         await abrir_pool()
+        await aplicar_esquema()
     except Exception as error:
         # A propósito NO reventamos: si Docker está apagado queremos que la API igual
-        # levante y lo diga en /health/db, en vez de negarse a arrancar.
-        logger.warning("No se pudo conectar a la base de datos al arrancar: %s", error)
+        # levante y lo diga en /health/db, en vez de negarse a arrancar. La ingesta
+        # tampoco se detiene: los ticks esperan en memoria hasta que vuelva la base.
+        logger.warning("Base de datos no disponible al arrancar: %s", error)
+
+    tareas: list[asyncio.Task[None]] = []
+
+    if settings.ingesta_activa:
+
+        async def consumir(tick: Tick) -> None:
+            """Qué hacemos con cada operación que llega del mercado.
+
+            Dos destinos, a propósito separados: la memoria guarda el AHORA (para responder
+            al instante) y la base guarda la HISTORIA (para tener con qué comparar).
+            """
+            estado_mercado.actualizar(tick)
+            escritor_de_ticks.encolar(tick)
+
+        tareas.append(asyncio.create_task(escuchar_ticks(consumir), name="ingesta-binance"))
+        tareas.append(asyncio.create_task(escritor_de_ticks.correr(), name="escritor-ticks"))
+    else:
+        logger.info("Ingesta desactivada (INGESTA_ACTIVA=false)")
 
     yield
 
     # --- Apagado ---
+    for tarea in tareas:
+        tarea.cancel()
+    await asyncio.gather(*tareas, return_exceptions=True)
+
+    # Último volcado: lo que quedó en la cola se guarda antes de cerrar el pool.
+    # Va después de cancelar las tareas para que nadie siga encolando mientras escribimos.
+    if tareas:
+        try:
+            guardados = await escritor_de_ticks.volcar()
+            if guardados:
+                logger.info("Volcado final: %d ticks guardados antes de cerrar", guardados)
+        except Exception as error:
+            logger.warning("No se pudo hacer el volcado final: %s", error)
+
     await cerrar_pool()
 
 
-app = FastAPI(title="Argos API", version="0.1.0", lifespan=lifespan)
+app = FastAPI(title="Argos API", version="0.2.0", lifespan=lifespan)
 
 
 @app.get("/health")
@@ -79,3 +127,20 @@ async def health_db() -> JSONResponse:
             "versiones": versiones,
         }
     )
+
+
+@app.get("/mercado/estado")
+def mercado_estado() -> dict[str, object]:
+    """Foto del mercado ahora mismo, respondida desde memoria (no toca la base de datos).
+
+    `simbolos` está vacío hasta que entre el primer tick: si todavía no sabemos el precio,
+    lo decimos, no lo inventamos.
+
+    `persistencia` es el pulso del escritor: `guardados` tiene que subir, `en_espera` tiene
+    que mantenerse bajo. Si `en_espera` crece sin parar, la base de datos no está recibiendo.
+    """
+    return {
+        "desde": estado_mercado.desde.isoformat(),
+        "simbolos": estado_mercado.instantanea(),
+        "persistencia": escritor_de_ticks.resumen(),
+    }

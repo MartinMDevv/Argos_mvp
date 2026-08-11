@@ -42,7 +42,22 @@ Verificar:
 - http://localhost:8000/health → `{"status":"ok","service":"argos-backend"}` (la API está viva)
 - http://localhost:8000/health/db → `{"status":"ok", ...}` con las versiones de Postgres y
   TimescaleDB (la API **llega a la base de datos**)
+- http://localhost:8000/mercado/estado → el precio de BTC/ETH **ahora mismo** + el pulso de la
+  ingesta (`guardados` tiene que subir; `en_espera` tiene que mantenerse bajo)
 - http://localhost:8000/docs → documentación interactiva (Swagger)
+
+> **Desde el paso 1.2 la API se conecta sola a Binance al arrancar** y empieza a guardar ticks.
+> Si querés trabajar sin abrir esa conexión (por ejemplo con `--reload`, que reinicia en cada cambio):
+> ```bash
+> INGESTA_ACTIVA=false uv run uvicorn app.main:app --reload --port 8000
+> ```
+
+Para mirar los ticks guardados directo en la base:
+```bash
+cd infra && set -a && . ./.env && set +a
+docker exec argos_timescaledb psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
+  -c "SELECT count(*), min(momento), max(momento) FROM ticks;"
+```
 
 > Si `/health/db` devuelve **503** con `"status":"sin_conexion"`, no es un bug: es el aviso de que
 > la base de datos no está arriba. Volvé al paso 1 (`docker-on` + `docker compose up -d --wait`).
@@ -95,5 +110,7 @@ npm run preview   # sirve el build de producción para probarlo
 - **`.env` de infra**: no se sube a git. Si clonás el repo en otra máquina, copiá `.env.example` a
   `.env` y poné la contraseña.
 - **Datos mock en el frontend**: por ahora BTC/ETH muestran números de ejemplo (en `src/data/coins.ts`).
-  Se reemplazan por datos reales del backend en la Fase 1–2.
+  El backend ya tiene datos reales (`/mercado/estado`); se enchufan al panel en la Fase 2.
+- **`en_espera` que no baja** en `/mercado/estado` significa que la ingesta anda pero la base no está
+  recibiendo. Revisá `/health/db`. Los ticks no se pierden mientras tanto (hay 20.000 de colchón).
 - **node_modules** y **dist/** están ignorados en git (los regeneran `npm install` / `npm run build`).

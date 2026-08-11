@@ -38,8 +38,13 @@ React+Vite+Tailwind con la piel de Argos; backend FastAPI conectado a la BD (poo
 ORM; config desde `infra/.env`; `/health` = API viva, `/health/db` = llega a la BD).
 **1.1 HECHO**: ingesta en vivo de Binance (`app/ingesta/binance.py`), stream `aggTrade` de BTC/ETH ->
 modelo `Tick` (`app/modelos.py`, precios en `Decimal`, UTC). El módulo solo escucha y traduce: entrega
-cada tick a un consumidor que recibe por parámetro (en 1.2 ese consumidor será el que escribe en la BD).
-Siguiente: **1.2 = persistir ticks en TimescaleDB** (hypertable + último estado en memoria).
+cada tick a un consumidor que recibe por parámetro.
+**1.2 HECHO**: cada tick va a dos destinos: memoria (`app/estado.py` = el ahora, responde al instante) y
+TimescaleDB (`sql/001_ticks.sql`, hypertable `ticks` = la historia). Escritura por lotes en
+`app/ingesta/almacen.py` con `executemany` + `ON CONFLICT DO NOTHING` (COPY se descartó: no admite
+ON CONFLICT y la dedup al reconectar no es negociable). La ingesta arranca con la API (`INGESTA_ACTIVA=false`
+para apagarla); si la BD se cae los ticks esperan en memoria (tope 20.000) y entran solos al volver.
+Endpoint `GET /mercado/estado`. Siguiente: **1.3 = velas por agregación + endpoint REST**.
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.

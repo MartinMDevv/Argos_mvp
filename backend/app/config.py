@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     postgres_host: str = "localhost"
     postgres_port: int = 5432
 
+    # --- Ingesta de mercado ---
+    # Si está en false, la API arranca sin conectarse a Binance. Sirve para trabajar en
+    # endpoints sin abrir una conexión al exchange cada vez que uvicorn recarga por un
+    # cambio de código. Se apaga poniendo INGESTA_ACTIVA=false en el entorno.
+    ingesta_activa: bool = True
+
     # --- Pool de conexiones ---
     # Cuántas conexiones mantiene abiertas y reciclando (abrir una cuesta caro).
     db_pool_min: int = 2
