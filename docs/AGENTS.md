@@ -13,6 +13,9 @@ reales; la IA solo los traduce a lenguaje natural. Sin dato, decir "no hay dato"
 
 ## 3. Guardarraíles
 - Foco MVP = solo BTC/ETH. Memecoins/Solana/on-chain/social/portafolio = "fase futura": se anotan, no se implementan.
+- Ideas de panel anotadas para v1.1 (medidor de veredicto técnico estilo TradingView, rejilla de rendimiento
+  por plazo, key stats, estacionalidad): están en el spec §2.F. El medidor NO puede aconsejar: muestra qué
+  dicen los indicadores calculados sobre datos reales, y de qué está hecho. No implementar todavía.
 - No inventar APIs, endpoints, columnas de BD, librerías ni datos; verificar contra código/docs reales. Ante duda, decirlo.
 - Bajo ruido > volumen de alertas.
 - Cambios pequeños y verificables, cada paso con un check concreto.
@@ -57,8 +60,16 @@ oficiales de Binance: idénticas al octavo decimal. Argos NO tiene historia ante
 empuja: `bienvenida` (foto al conectarse), `estado` (cuando cambia algo, máximo cada 0,5 s) y `latido`
 (cada 15 s de silencio, para distinguir conexión viva de conexión muerta). NO se manda cada tick: bajo
 ruido, ~1,6 msg/s en vez de ~40. Envíos en paralelo para que un panel lento no frene a los demás. CORS
-solo para los orígenes de desarrollo (nunca `*`). Siguiente: **2.1 = gráfico de velas en vivo en el
-frontend** (reemplazar el mock de `src/data/coins.ts`).
+solo para los orígenes de desarrollo (nunca `*`).
+**2.1 HECHO**: el gráfico del Panel usa datos reales. `src/lib/api.ts` (puente REST + tipos de la API),
+`src/lib/mercado.tsx` (`ProveedorMercado`: UNA conexión WebSocket para toda la app, montada en `main.tsx`;
+reconexión con espera creciente igual que con Binance) y `CandleChart.tsx` reescrito con
+**lightweight-charts v5** (ojo: la API v5 es `chart.addSeries(CandlestickSeries, …)`, no
+`addCandlestickSeries()`). **Decisión clave:** la historia sale de `/mercado/velas` (verdad) y el WebSocket
+mueve la vela en curso (inmediatez), pero cada 10 s se le vuelve a preguntar a la base y se corrige —
+entre dos fotos del WebSocket puede escaparse un pico, y el máximo de una vela no se aproxima. Máx/mín se
+combinan con `Math.max`/`Math.min` para que ninguna fuente achique a la otra. Si no hay datos se dice, no
+se inventa. Gráfico fijo en BTCUSDT · 1m. Siguen en mock watchlist/tabla/sidebar → **siguiente 2.2**.
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.
