@@ -44,7 +44,15 @@ TimescaleDB (`sql/001_ticks.sql`, hypertable `ticks` = la historia). Escritura p
 `app/ingesta/almacen.py` con `executemany` + `ON CONFLICT DO NOTHING` (COPY se descartó: no admite
 ON CONFLICT y la dedup al reconectar no es negociable). La ingesta arranca con la API (`INGESTA_ACTIVA=false`
 para apagarla); si la BD se cae los ticks esperan en memoria (tope 20.000) y entran solos al volver.
-Endpoint `GET /mercado/estado`. Siguiente: **1.3 = velas por agregación + endpoint REST**.
+Endpoint `GET /mercado/estado`.
+**1.3 HECHO**: velas OHLCV en `app/velas.py` con `time_bucket` + `first`/`last` de Timescale (la agregación
+la hace la BD, no Python); intervalos 1m/5m/15m/1h/4h/1d; `GET /mercado/velas`. **Ojo con dos cosas que
+costaron encontrar:** (a) apertura y cierre se ordenan por `id_operacion` y NO por `momento`, porque Binance
+manda operaciones con el mismo milisegundo y el desempate por tiempo hacía el cierre no determinista (~6% de
+las velas); (b) una vela se marca `completa` recién 5 s después de cerrar el tramo (`MARGEN_ASENTADO`), porque
+el escritor vuelca de a lotes cada 2 s y si no la bandera mentiría en el borde. Verificado contra las velas
+oficiales de Binance: idénticas al octavo decimal. Argos NO tiene historia anterior a su primer arranque
+(backfill = fase futura). Siguiente: **1.4 = WebSocket propio que empuja precios al frontend**.
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.

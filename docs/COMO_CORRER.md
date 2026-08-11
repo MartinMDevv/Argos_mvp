@@ -44,6 +44,8 @@ Verificar:
   TimescaleDB (la API **llega a la base de datos**)
 - http://localhost:8000/mercado/estado → el precio de BTC/ETH **ahora mismo** + el pulso de la
   ingesta (`guardados` tiene que subir; `en_espera` tiene que mantenerse bajo)
+- http://localhost:8000/mercado/velas?simbolo=BTCUSDT&intervalo=1m&limite=20 → velas OHLCV
+  (intervalos: `1m`, `5m`, `15m`, `1h`, `4h`, `1d`)
 - http://localhost:8000/docs → documentación interactiva (Swagger)
 
 > **Desde el paso 1.2 la API se conecta sola a Binance al arrancar** y empieza a guardar ticks.
@@ -113,4 +115,9 @@ npm run preview   # sirve el build de producción para probarlo
   El backend ya tiene datos reales (`/mercado/estado`); se enchufan al panel en la Fase 2.
 - **`en_espera` que no baja** en `/mercado/estado` significa que la ingesta anda pero la base no está
   recibiendo. Revisá `/health/db`. Los ticks no se pierden mientras tanto (hay 20.000 de colchón).
+- **Pocas velas al principio, y con huecos**: Argos solo tiene lo que vio desde que lo encendiste, y
+  cada vez que lo apagás queda un hueco en esos minutos. No se rellenan ni se inventan. Traer historia
+  vieja desde Binance (backfill) es un paso posterior.
+- **La última vela siempre viene con `completa: false`**: su tramo todavía no terminó y sus números van
+  a seguir cambiando. No la uses como cerrada.
 - **node_modules** y **dist/** están ignorados en git (los regeneran `npm install` / `npm run build`).

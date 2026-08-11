@@ -30,7 +30,10 @@
   *(tabla `ticks` en `sql/001_ticks.sql`; escritura por lotes en `app/ingesta/almacen.py`;
   memoria en `app/estado.py`; la ingesta arranca con la API. Ver: `GET /mercado/estado`.
   Aguanta que se caiga la base: los ticks esperan y entran solos cuando vuelve)*
-- [ ] **1.3** Armar velas (candles) por agregación + endpoint REST para consultarlas
+- [x] **1.3** Armar velas (candles) por agregación + endpoint REST para consultarlas ✅
+  *(`app/velas.py` con `time_bucket` + `first`/`last` de Timescale; intervalos 1m/5m/15m/1h/4h/1d.
+  `GET /mercado/velas?simbolo=BTCUSDT&intervalo=1m&limite=200`. Verificado contra las velas
+  oficiales de Binance: idénticas hasta el octavo decimal)*
 - [ ] **1.4** WebSocket del backend que empuja precios en vivo al frontend
 
 ## FASE 2 — Dashboard base
@@ -60,10 +63,10 @@ Luego seguimos el **roadmap de versiones** (v1.1 → v5.0) del [spec](../../spec
 
 ---
 
-**👉 Estamos aquí:** **Fase 0 cerrada** (0.1 a 0.5), **1.1 y 1.2 hechos**: el dato real del mercado entra
-y **queda guardado** en TimescaleDB, con el precio del momento disponible al instante en memoria.
-Siguiente: **1.3 — armar velas por agregación + endpoint REST**, o sea convertir el chorro de ticks en
-algo que un gráfico pueda dibujar.
+**👉 Estamos aquí:** **Fase 0 cerrada** (0.1 a 0.5) y **1.1, 1.2 y 1.3 hechos**: el dato real entra,
+queda guardado, y ya se puede pedir en forma de velas listas para dibujar. Siguiente:
+**1.4 — WebSocket propio del backend que empuja los precios al frontend**, para que el panel deje de
+preguntar y pase a recibir.
 
 ### Cómo levantar el frontend
 ```bash

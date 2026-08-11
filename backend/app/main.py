@@ -4,8 +4,9 @@ Signos vitales:
     GET /health           → ¿está viva la API?           (no toca la base de datos)
     GET /health/db        → ¿la API llega a la BD?       (hace una consulta real)
 
-Mercado (paso 1.2):
-    GET /mercado/estado   → último precio de cada símbolo + salud de la ingesta
+Mercado:
+    GET /mercado/estado   → último precio de cada símbolo + salud de la ingesta   (paso 1.2)
+    GET /mercado/velas    → velas OHLCV para dibujar el gráfico                   (paso 1.3)
 
 Desde el paso 1.2, al arrancar la API se encienden además dos tareas de fondo que corren
 para siempre: una escucha Binance y otra va guardando lo que llega en TimescaleDB.
@@ -15,8 +16,10 @@ import asyncio
 import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
+from datetime import datetime
+from typing import Literal
 
-from fastapi import FastAPI
+from fastapi import FastAPI, HTTPException, Query
 from fastapi.responses import JSONResponse
 
 from app.config import obtener_settings
@@ -24,8 +27,9 @@ from app.db import abrir_pool, cerrar_pool, revisar_conexion
 from app.esquema import aplicar_esquema
 from app.estado import EstadoMercado
 from app.ingesta.almacen import EscritorDeTicks
-from app.ingesta.binance import escuchar_ticks
+from app.ingesta.binance import SIMBOLOS_MVP, escuchar_ticks
 from app.modelos import Tick
+from app.velas import LIMITE_MAXIMO, obtener_velas, vela_a_json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -144,3 +148,67 @@ def mercado_estado() -> dict[str, object]:
         "simbolos": estado_mercado.instantanea(),
         "persistencia": escritor_de_ticks.resumen(),
     }
+
+
+@app.get("/mercado/velas")
+async def mercado_velas(
+    simbolo: str = Query(
+        description=f"Par a consultar. El MVP vigila solo: {', '.join(SIMBOLOS_MVP)}.",
+    ),
+    intervalo: Literal["1m", "5m", "15m", "1h", "4h", "1d"] = Query(
+        default="1m",
+        description="Duración de cada vela.",
+    ),
+    limite: int = Query(
+        default=200,
+        ge=1,
+        le=LIMITE_MAXIMO,
+        description="Cuántas velas devolver, contando desde la más reciente hacia atrás.",
+    ),
+    desde: datetime | None = Query(
+        default=None,
+        description="Opcional: ignorar los ticks anteriores a este momento (ISO 8601).",
+    ),
+) -> JSONResponse:
+    """Velas OHLCV armadas sobre los ticks guardados, en orden cronológico.
+
+    **Ojo con la última vela**: viene con `completa: false` porque su tramo todavía no
+    terminó. Sus valores van a seguir cambiando hasta que cierre el minuto (o la hora).
+
+    **Ojo con la historia**: Argos solo tiene lo que vio desde que lo encendiste por primera
+    vez. No hay velas de antes de eso, y no las inventamos. Traer historia vieja de Binance
+    es un paso posterior.
+    """
+    # Lo validamos a mano contra la lista del MVP para poder responder con un mensaje útil
+    # en vez de devolver una lista vacía que parezca "no hubo operaciones".
+    if simbolo not in SIMBOLOS_MVP:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "simbolo_no_vigilado",
+                "detalle": f"Argos todavía no vigila '{simbolo}'.",
+                "disponibles": list(SIMBOLOS_MVP),
+            },
+        )
+
+    try:
+        velas = await obtener_velas(simbolo, intervalo, limite, desde)
+    except Exception as error:
+        logger.warning("No se pudieron armar las velas: %s", error)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "sin_conexion",
+                "detalle": str(error),
+                "pista": "¿Está levantada la base? Probá GET /health/db",
+            },
+        ) from error
+
+    return JSONResponse(
+        content={
+            "simbolo": simbolo,
+            "intervalo": intervalo,
+            "cantidad": len(velas),
+            "velas": [vela_a_json(vela) for vela in velas],
+        }
+    )

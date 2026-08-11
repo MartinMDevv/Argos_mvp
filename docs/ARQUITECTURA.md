@@ -32,6 +32,7 @@ backend/
 │   ├── db.py            → pool de conexiones a TimescaleDB (asyncpg) + chequeo de conexión
 │   ├── esquema.py       → aplica los .sql de sql/ al arrancar (idempotente)
 │   ├── estado.py        → EstadoMercado: último tick de cada símbolo, en memoria
+│   ├── velas.py         → arma velas OHLCV con time_bucket de TimescaleDB (paso 1.3)
 │   ├── modelos.py       → modelos de dominio (hoy: Tick). No sabe de exchanges ni de BD
 │   ├── ingesta/
 │   │   ├── binance.py   → escucha el WebSocket de Binance y emite Ticks (paso 1.1)
@@ -121,6 +122,30 @@ Cada tick que entra va a **dos lugares distintos, con propósitos distintos**:
 - **Esquema idempotente**: los `.sql` de `backend/sql/` se aplican enteros en cada arranque (`IF NOT
   EXISTS`). Alcanza mientras solo *creemos* cosas; el día que haya que *cambiar* algo ya creado, hará
   falta control de migraciones de verdad.
+
+**Cómo se arman las velas** (decidido en el paso 1.3):
+
+- **La agrupación la hace la base, no Python**: traerse 50.000 ticks por la red para tirar el 99% no
+  tiene sentido. `velas.py` manda una consulta y recibe las velas ya calculadas.
+- **`time_bucket()`** es el `GROUP BY` por tramos de tiempo de Timescale: tira cada tick al cajón que le
+  toca. Postgres pelado obligaría a malabares con `date_trunc`, que además no sirve para tramos como 5m o 4h.
+- **`first(precio, momento)` / `last(precio, momento)`**: dan el primer y último valor de un grupo *según
+  otra columna* — exactamente la apertura y el cierre de una vela. En SQL estándar esto pide funciones de
+  ventana; acá es una línea.
+- **Intervalo parametrizado, no interpolado**: los tramos válidos son una lista cerrada (`INTERVALOS`) y el
+  ancho viaja como parámetro `$1::interval`. El usuario nunca escribe algo que termine dentro de la consulta.
+- **No se rellenan huecos**: si en un tramo no hubo operaciones, no hay vela. No se interpola ni se repite el
+  precio anterior — si no hay dato, no hay dato. (Timescale tiene `time_bucket_gapfill` si algún día se
+  quiere rellenar *para dibujar*, pero es una decisión de presentación, no del dato.)
+- **Bandera `completa`**: la última vela siempre está formándose, y darla por cerrada haría creer que su
+  mínimo ya está definido. Además se espera un `MARGEN_ASENTADO` de 5 s antes de declararla completa,
+  porque el escritor vuelca de a lotes cada 2 s: justo al cerrar el minuto, sus últimos ticks pueden estar
+  todavía en memoria. Sin ese margen la bandera mentiría en el borde.
+- **Se calcula en cada consulta**. Simple y siempre al día. Cuando haya mucha historia y se pidan rangos
+  largos, el reemplazo natural son las *continuous aggregates* de Timescale (velas pre-calculadas que se
+  refrescan solas).
+- **Argos solo tiene lo que vio**: no hay historia anterior al primer arranque y no se inventa. Traer
+  historia vieja desde la API REST de Binance (backfill) es un paso posterior.
 
 ## 🖥️ frontend/ — React 19 + Vite + Tailwind v4 (TypeScript)
 

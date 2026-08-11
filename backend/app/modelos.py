@@ -64,3 +64,54 @@ class Tick:
     def lado_agresor(self) -> str:
         """Quién tomó la iniciativa en esta operación: "compra" o "venta"."""
         return "venta" if self.comprador_pasivo else "compra"
+
+
+@dataclass(frozen=True, slots=True)
+class Vela:
+    """El resumen de todo lo que pasó en un tramo de tiempo. La barrita del gráfico.
+
+    Un tick suelto no dice nada: en un minuto de BTC hay cientos y son ruido puro. La vela
+    comprime ese minuto en cinco números que sí cuentan una historia:
+
+        apertura → a cuánto empezó el tramo
+        máximo   → lo más alto que llegó
+        mínimo   → lo más bajo que tocó
+        cierre   → a cuánto terminó
+        volumen  → cuánto se movió
+
+    Es también la unidad con la que van a trabajar los detectores: "el precio se movió 3% en
+    5 minutos" se responde mirando velas, no ticks.
+    """
+
+    inicio: datetime
+    """Comienzo del tramo, en UTC. Una vela de 1m que empieza 10:03:00 cubre hasta 10:03:59."""
+
+    apertura: Decimal
+    maximo: Decimal
+    minimo: Decimal
+    cierre: Decimal
+
+    volumen: Decimal
+    """Cuánto se operó en la moneda base. Ej: 12.4 BTC."""
+
+    volumen_cotizado: Decimal
+    """Cuánto dinero cambió de manos. Ej: 794.000 USDT. Para comparar entre activos, este."""
+
+    operaciones: int
+    """Cuántas operaciones hubo en el tramo. Muchas operaciones chicas y pocas grandes son
+    situaciones distintas aunque el volumen sea el mismo."""
+
+    completa: bool
+    """False si el tramo TODAVÍA no terminó (es la vela que se está formando ahora mismo).
+
+    Importa: la última vela siempre está a medio hacer, y mostrarla como cerrada haría creer
+    que el mínimo del minuto ya está definido cuando puede caer más en los próximos segundos.
+    Preferimos decir que está incompleta antes que dar por firme algo que no lo está.
+    """
+
+    @property
+    def variacion(self) -> Decimal:
+        """Cuánto se movió el precio dentro del tramo, en porcentaje (cierre contra apertura)."""
+        if self.apertura == 0:
+            return Decimal(0)
+        return (self.cierre - self.apertura) / self.apertura * 100
