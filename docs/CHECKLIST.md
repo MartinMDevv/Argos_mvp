@@ -48,6 +48,14 @@ TimescaleDB → velas → empujado al panel.
   `CandleChart.tsx` reescrito con lightweight-charts v5. La historia sale de `/mercado/velas` y el
   WebSocket mueve la vela en curso; cada 10 s se le vuelve a preguntar a la base para corregir el
   máximo/mínimo, porque entre dos fotos del WebSocket puede haberse escapado un pico)*
+- [x] **2.1b** Backfill: traer desde Binance la historia que Argos no vivió ✅
+  *(No estaba en el plan original: salió de mirar el gráfico y ver que el eje de tiempo pegaba
+  saltos. Argos tenía 100 minutos repartidos en 13 horas — 12,6% de cobertura. `sql/002_velas_historicas.sql`
+  (tabla aparte: una kline NO es un tick) + `app/ingesta/backfill.py` (pagina la REST de Binance,
+  1.000 velas por pedido, respetando el peso) + fusión en `velas.py`. Se descarga solo el intervalo
+  de 1m; el resto se agrega. Verificado: en los minutos con cobertura continua nuestras velas y las
+  de Binance son idénticas (112 de 119); las 7 que diferían eran minutos de borde —arranque o
+  apagado— donde la nuestra estaba mocha, que es justo lo que la fusión repara.)*
 - [ ] **2.2** Watchlist BTC/ETH + panel de estado (precio, cambio %) *(y selector de moneda/intervalo:
   el gráfico está fijo en BTCUSDT · 1m)*
 
@@ -74,10 +82,29 @@ Luego seguimos el **roadmap de versiones** (v1.1 → v5.0) del [spec](../../spec
 
 ---
 
-**👉 Estamos aquí:** **Fases 0 y 1 cerradas + 2.1 hecho.** El backend ve el mercado, lo guarda, lo
-resume en velas y lo empuja en vivo — y el gráfico del Panel ya lo dibuja con datos reales, moviéndose
-solo. Siguiente: **2.2 — watchlist y panel de estado con datos reales** (precio y cambio %), más el
-selector de moneda e intervalo, que jubila lo que queda de `src/data/coins.ts`.
+## 📌 Anotado para más adelante (NO se implementa ahora)
+
+Ideas que salieron trabajando y quedaron parqueadas a propósito, para no desviar el MVP. El detalle
+de cada una está en el [spec, §2.F](../../spec-crypto-monitor.md).
+
+- [ ] **Revisión completa del frontend** — pantalla completa / expandir el gráfico, selector de rango
+  temporal (1D/1W/1M/3M/6M/YTD/1Y/All, que **no es lo mismo** que el intervalo de vela), enchufar los
+  botones `15m/1H/4H/1D` que hoy son decorativos, volumen real bajo el gráfico, leyenda O/H/L/C bajo
+  el cursor, logo del pavo real de verdad, estados de carga/error unificados, responsive y
+  accesibilidad. *Después del MVP funcional: pulir la vitrina de una tienda vacía es el orden
+  equivocado.*
+- [ ] **Medidor de veredicto técnico** (venta fuerte → compra fuerte) + rejilla de rendimiento por
+  plazo + key stats + estacionalidad. Va en **v1.1**, que es cuando existirán los indicadores de los
+  que tiene que salir. Ojo con la regla de oro: el medidor informa qué dicen los indicadores, **no
+  aconseja**.
+
+---
+
+**👉 Estamos aquí:** **Fases 0 y 1 cerradas + 2.1 y 2.1b hechos.** El backend ve el mercado, lo guarda,
+lo resume en velas y lo empuja en vivo; el gráfico del Panel lo dibuja con datos reales moviéndose solo;
+y con el backfill ya no tiene huecos: hay un año de historia real detrás. Siguiente: **2.2 — watchlist y
+panel de estado con datos reales** (precio y cambio %), más el selector de moneda e intervalo, que jubila
+lo que queda de `src/data/coins.ts`.
 
 ### Cómo levantar el frontend
 ```bash

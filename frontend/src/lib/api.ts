@@ -62,6 +62,15 @@ export interface VelaJSON {
   volumen_cotizado: string
   operaciones: number
   variacion: string
+  /**
+   * De dónde salieron los números: `propia` (ticks que Argos vio), `historia` (vela oficial de
+   * Binance traída por el backfill) o `mixta` (el tramo abarca minutos de las dos clases).
+   *
+   * Los precios son igual de reales en los tres casos. Lo que cambia es `operaciones`: en las
+   * propias son operaciones agrupadas y en las históricas son las reales, siempre más. No se
+   * comparan entre sí.
+   */
+  fuente: 'propia' | 'historia' | 'mixta'
   /** `false` mientras el tramo se sigue formando. La última vela siempre está a medio hacer. */
   completa: boolean
 }

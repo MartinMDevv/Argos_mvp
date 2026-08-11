@@ -69,7 +69,16 @@ reconexión con espera creciente igual que con Binance) y `CandleChart.tsx` rees
 mueve la vela en curso (inmediatez), pero cada 10 s se le vuelve a preguntar a la base y se corrige —
 entre dos fotos del WebSocket puede escaparse un pico, y el máximo de una vela no se aproxima. Máx/mín se
 combinan con `Math.max`/`Math.min` para que ninguna fuente achique a la otra. Si no hay datos se dice, no
-se inventa. Gráfico fijo en BTCUSDT · 1m. Siguen en mock watchlist/tabla/sidebar → **siguiente 2.2**.
+se inventa. Gráfico fijo en BTCUSDT · 1m. Siguen en mock watchlist/tabla/sidebar.
+**2.1b HECHO (backfill, no estaba en el plan)**: Argos ya NO empieza sin memoria. `sql/002_velas_historicas.sql`
+(tabla aparte, **una kline NO es un tick**: meterlas en `ticks` obligaría a inventar operaciones y envenenaría
+los detectores de volumen) + `app/ingesta/backfill.py` (pagina `api/v3/klines`, 1.000 por pedido, mira
+`x-mbx-used-weight-1m` y respeta `Retry-After`; **nunca guarda la vela en curso**) + fusión en `velas.py`.
+Se descarga **solo 1m**; el resto se agrega. Regla de desempate: **minuto cerrado → manda la vela de Binance**
+(la nuestra puede estar mocha si Argos arrancó a mitad); **minuto en curso → siempre nuestro**. Cada vela dice
+su `fuente` (`propia`/`historia`/`mixta`) porque `operaciones` NO se cuenta igual en ambas (aggTrades vs reales).
+Correr: `uv run python -m app.ingesta.backfill --simbolo BTCUSDT ETHUSDT --dias 365` (incremental).
+**Siguiente: 2.2.**
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.

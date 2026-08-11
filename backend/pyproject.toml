@@ -9,4 +9,5 @@ dependencies = [
     "asyncpg>=0.30",       # driver async de Postgres/TimescaleDB (con pool propio)
     "pydantic-settings>=2.6",  # carga la configuración desde el .env y la valida
     "websockets>=14",     # cliente WebSocket async (ingesta en vivo de Binance)
+    "httpx>=0.28",        # cliente HTTP async (backfill de historia desde la REST de Binance)
 ]

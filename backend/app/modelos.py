@@ -99,7 +99,25 @@ class Vela:
 
     operaciones: int
     """Cuántas operaciones hubo en el tramo. Muchas operaciones chicas y pocas grandes son
-    situaciones distintas aunque el volumen sea el mismo."""
+    situaciones distintas aunque el volumen sea el mismo.
+
+    ⚠️ **Cuidado al comparar entre velas de distinta `fuente`.** En las velas que armamos
+    nosotros esto cuenta `aggTrade` (operaciones agrupadas por Binance); en las históricas
+    cuenta las operaciones reales. Las históricas siempre dan un número mayor. Los dos son
+    correctos, pero miden cosas distintas: no los restes ni los promedies entre sí.
+    """
+
+    fuente: str
+    """De dónde salieron estos números: `propia`, `historia` o `mixta`.
+
+    - `propia`   → lo armamos con los ticks que Argos vio con sus propios ojos.
+    - `historia` → vela oficial de Binance, traída por el backfill (los minutos que nos perdimos).
+    - `mixta`    → el tramo abarca minutos de las dos clases (pasa en el borde entre ambas).
+
+    Existe porque Argos no debe hacer pasar una cosa por otra. Los precios son igual de reales
+    en los dos casos, pero `operaciones` no se cuenta igual, y quien lea estos datos —un
+    detector, el panel, la IA— tiene derecho a saber con qué está tratando.
+    """
 
     completa: bool
     """False si el tramo TODAVÍA no terminó (es la vela que se está formando ahora mismo).

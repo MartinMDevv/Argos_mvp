@@ -39,9 +39,16 @@ Detalle de cada carpeta y del mapa de componentes del frontend:
 
 ## Estado
 
-🚧 **En construcción — Fase 0 (cimientos), casi lista.** Las tres patas ya respiran por separado
-(base de datos viva, API `/health`, panel con toda la piel de Argos); aún **no están conectadas**
-entre sí. Estado tildable en [`docs/CHECKLIST.md`](docs/CHECKLIST.md).
+🚧 **En construcción — Fases 0 y 1 cerradas, Fase 2 en marcha.**
+
+La cadena anda de punta a punta: Argos escucha el WebSocket de Binance, guarda cada operación en
+TimescaleDB, la resume en velas y se las empuja al panel, que las dibuja moviéndose en vivo. Además
+tiene un año de historia real traída de Binance, así que el gráfico no arranca vacío ni con huecos.
+
+Falta que el resto del panel (watchlist, tabla de mercados) deje el mock, y toda la parte que le da
+sentido a Argos: los detectores de alertas, Telegram y la IA que explica.
+
+Estado tildable en [`docs/CHECKLIST.md`](docs/CHECKLIST.md).
 
 ## Cómo levantarlo
 

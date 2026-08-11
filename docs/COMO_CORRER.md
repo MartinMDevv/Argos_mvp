@@ -68,6 +68,29 @@ Verificar:
 > INGESTA_ACTIVA=false uv run uvicorn app.main:app --reload --port 8000
 > ```
 
+### Traer la historia que Argos no vivió (paso 2.1b)
+
+Argos solo tiene lo que escuchó desde que lo encendiste. Para que el gráfico se vea continuo —y sobre
+todo para que los detectores de la Fase 3 tengan con qué comparar— se baja la historia real de Binance:
+
+```bash
+cd backend
+uv run python -m app.ingesta.backfill                             # BTC y ETH, 365 días
+uv run python -m app.ingesta.backfill --simbolo BTCUSDT --dias 30 # solo BTC, 30 días
+```
+
+- Tarda **unos minutos** la primera vez (un año son ~526 pedidos por símbolo, y va despacio a propósito
+  para no chocar con los límites de Binance). Después es **incremental**: solo pide lo que falta.
+- **Se puede reejecutar sin miedo**: lo que ya está se descarta solo.
+- Necesita la base de datos arriba. No necesita que el backend esté corriendo.
+- Ocupa ~78 MB por símbolo al año (medido). Para comparar: la ingesta en vivo escribe ~75 MB **por día**.
+
+Comprobar qué historia hay:
+```bash
+docker exec argos_timescaledb psql -U argos -d argos \
+  -c "SELECT simbolo, count(*), min(inicio), max(inicio) FROM velas_historicas GROUP BY simbolo;"
+```
+
 Para mirar los ticks guardados directo en la base:
 ```bash
 cd infra && set -a && . ./.env && set +a
@@ -147,9 +170,12 @@ npx tsc -b        # solo el chequeo de tipos, sin compilar
   minutos, o mirá un intervalo corto (`1m`).
 - **`en_espera` que no baja** en `/mercado/estado` significa que la ingesta anda pero la base no está
   recibiendo. Revisá `/health/db`. Los ticks no se pierden mientras tanto (hay 20.000 de colchón).
-- **Pocas velas al principio, y con huecos**: Argos solo tiene lo que vio desde que lo encendiste, y
-  cada vez que lo apagás queda un hueco en esos minutos. No se rellenan ni se inventan. Traer historia
-  vieja desde Binance (backfill) es un paso posterior.
+- **Pocas velas al principio, y con huecos**: Argos solo arma velas de lo que escuchó, y cada apagón deja
+  un hueco. **La solución es el backfill** (más arriba): corrélo una vez y el gráfico queda continuo. Los
+  huecos que queden después de correrlo son minutos posteriores a la última descarga → volvé a correrlo.
+- **La vela dice de dónde salió** (campo `fuente`): `propia` si la armamos con nuestros ticks, `historia`
+  si vino del backfill, `mixta` si el tramo abarca las dos. Ojo con `operaciones`: en las propias son
+  operaciones **agrupadas** y en las históricas son las **reales** (siempre más). No los compares entre sí.
 - **La última vela siempre viene con `completa: false`**: su tramo todavía no terminó y sus números van
   a seguir cambiando. No la uses como cerrada.
 - **node_modules** y **dist/** están ignorados en git (los regeneran `npm install` / `npm run build`).

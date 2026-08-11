@@ -23,6 +23,21 @@ Las dos herramientas que usamos son propias de TimescaleDB y valen la pena:
   real de los hechos y da siempre el mismo resultado. Es también el criterio que usa Binance para
   el cierre de sus propias velas, por eso ahora coinciden.
 
+## Dos fuentes en la misma serie (paso 2.1b)
+Argos solo puede armar velas de los minutos que escuchó. Todo lo anterior a su primer arranque
+—y cada apagón— sería un agujero. Por eso existe `velas_historicas`: las velas oficiales de
+Binance, bajadas por `ingesta/backfill.py`, que son exactamente los minutos que nos perdimos.
+
+La consulta pone las dos fuentes en la misma mesa **a resolución de un minuto** y recién después
+arma el intervalo pedido. La regla de desempate es simple: **para un minuto cerrado manda la
+vela oficial de Binance**, porque incluye todas las operaciones del minuto (la nuestra puede
+estar mocha si Argos arrancó a mitad de camino); **el minuto en curso siempre es nuestro**,
+porque el backfill nunca guarda una vela a medio formar y nuestros ticks son de hace segundos.
+
+Cada vela devuelta dice de dónde salió en su campo `fuente` (`propia`, `historia` o `mixta`).
+No se disimula la mezcla: los precios son igual de reales en ambos casos, pero `operaciones` no
+se cuenta igual (ver `Vela.operaciones` en `modelos.py`).
+
 ## Lo que este módulo NO hace: inventar velas
 Si en un tramo no hubo ninguna operación, no hay vela. No se rellena con el precio anterior ni
 se interpola: si no hay dato, no hay dato. (Timescale tiene `time_bucket_gapfill` para rellenar
@@ -70,9 +85,30 @@ se haya demorado. Cuesta 5 segundos de latencia y compra que "completa" signifiq
 completa — que es lo único que hace útil a esa bandera."""
 
 SQL_VELAS = """
-    WITH agrupadas AS (
+    WITH limites AS (
+        -- El dato más nuevo que tenemos del símbolo, mirando las DOS fuentes.
+        -- Sirve para acotar el escaneo sin usar now(): si Argos estuvo apagado dos días,
+        -- un piso calculado desde "ahora" dejaría fuera todo lo que sí tenemos.
+        SELECT greatest(
+            COALESCE((SELECT max(inicio)  FROM velas_historicas WHERE simbolo = $2),
+                     '-infinity'::timestamptz),
+            COALESCE((SELECT max(momento) FROM ticks            WHERE simbolo = $2),
+                     '-infinity'::timestamptz)
+        ) AS ultimo
+    ),
+    piso AS (
+        -- Desde dónde miramos. Si no mandan "desde", se calcula uno: el ancho del intervalo
+        -- por el doble de velas pedidas. Sin este piso, cada consulta escanearía el año
+        -- entero de historia para devolver 200 velas.
+        SELECT COALESCE(
+            $4::timestamptz,
+            (SELECT ultimo FROM limites) - $1::interval * ($3 * 2)
+        ) AS desde
+    ),
+    minutos_propios AS (
+        -- Los minutos que Argos vio con sus propios ojos, armados desde los ticks.
         SELECT
-            time_bucket($1::interval, momento) AS inicio,
+            time_bucket('1 minute'::interval, momento) AS minuto,
             -- Apertura y cierre se ordenan por `id_operacion`, NO por `momento`.
             -- Motivo (medido, no teórico): Binance manda varias operaciones con el mismo
             -- milisegundo exacto, y ordenando por tiempo el desempate queda al azar — el
@@ -84,11 +120,51 @@ SQL_VELAS = """
             last(precio, id_operacion)         AS cierre,
             sum(cantidad)                      AS volumen,
             sum(precio * cantidad)             AS volumen_cotizado,
-            count(*)                           AS operaciones
+            count(*)::int                      AS operaciones,
+            false                              AS es_historia
         FROM ticks
         WHERE simbolo = $2
-          -- Si no mandan "desde", este filtro se anula y se mira toda la historia.
-          AND ($4::timestamptz IS NULL OR momento >= $4)
+          AND momento >= (SELECT desde FROM piso)
+        GROUP BY minuto
+    ),
+    minutos AS (
+        -- Las dos fuentes puestas en la misma mesa, a resolución de un minuto.
+        -- Para un minuto CERRADO manda la vela oficial de Binance: incluye todas las
+        -- operaciones del minuto, mientras que la nuestra solo tiene lo que alcanzamos a
+        -- escuchar (si Argos arrancó a mitad del minuto, la nuestra está mocha).
+        SELECT inicio AS minuto, apertura, maximo, minimo, cierre,
+               volumen, volumen_cotizado, operaciones, true AS es_historia
+        FROM velas_historicas
+        WHERE simbolo = $2
+          AND inicio >= (SELECT desde FROM piso)
+
+        UNION ALL
+
+        -- …y los nuestros solo donde no hay vela oficial. Ahí entra siempre el minuto en
+        -- curso, que el backfill nunca guarda porque todavía se está formando.
+        SELECT p.* FROM minutos_propios p
+        WHERE NOT EXISTS (
+            SELECT 1 FROM velas_historicas h
+            WHERE h.simbolo = $2 AND h.inicio = p.minuto
+        )
+    ),
+    agrupadas AS (
+        -- Recién acá se arma el intervalo pedido. Agregar minutos da lo mismo que agregar
+        -- los ticks directamente: la apertura es la del primer minuto, el cierre la del
+        -- último, el máximo el mayor de los máximos y el volumen la suma.
+        SELECT
+            time_bucket($1::interval, minuto) AS inicio,
+            first(apertura, minuto)           AS apertura,
+            max(maximo)                       AS maximo,
+            min(minimo)                       AS minimo,
+            last(cierre, minuto)              AS cierre,
+            sum(volumen)                      AS volumen,
+            sum(volumen_cotizado)             AS volumen_cotizado,
+            sum(operaciones)::int             AS operaciones,
+            -- De qué está hecha la vela. No se oculta la mezcla: se informa.
+            bool_and(es_historia)             AS toda_historia,
+            bool_or(es_historia)              AS algo_historia
+        FROM minutos
         GROUP BY inicio
         -- Ordenamos al revés para quedarnos con las MÁS RECIENTES…
         ORDER BY inicio DESC
@@ -136,10 +212,23 @@ async def obtener_velas(
             volumen=fila["volumen"],
             volumen_cotizado=fila["volumen_cotizado"],
             operaciones=fila["operaciones"],
+            fuente=_fuente(fila["toda_historia"], fila["algo_historia"]),
             completa=(fila["inicio"] + ancho) <= limite_completas,
         )
         for fila in filas
     ]
+
+
+def _fuente(toda_historia: bool, algo_historia: bool) -> str:
+    """Traduce las dos banderas de la consulta al nombre de la fuente.
+
+    Ver `Vela.fuente` en `modelos.py` para qué significa cada una y por qué importa.
+    """
+    if toda_historia:
+        return "historia"
+    if not algo_historia:
+        return "propia"
+    return "mixta"
 
 
 def vela_a_json(vela: Vela) -> dict[str, object]:
@@ -157,6 +246,7 @@ def vela_a_json(vela: Vela) -> dict[str, object]:
         "volumen": str(vela.volumen),
         "volumen_cotizado": str(vela.volumen_cotizado),
         "operaciones": vela.operaciones,
+        "fuente": vela.fuente,
         "variacion": str(vela.variacion.quantize(Decimal("0.01"))),
         "completa": vela.completa,
     }

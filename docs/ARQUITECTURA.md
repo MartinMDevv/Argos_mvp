@@ -34,16 +34,18 @@ backend/
 │   ├── db.py            → pool de conexiones a TimescaleDB (asyncpg) + chequeo de conexión
 │   ├── esquema.py       → aplica los .sql de sql/ al arrancar (idempotente)
 │   ├── estado.py        → EstadoMercado: último tick de cada símbolo, en memoria
-│   ├── velas.py         → arma velas OHLCV con time_bucket de TimescaleDB (paso 1.3)
+│   ├── velas.py         → arma velas OHLCV; fusiona ticks propios + historia (pasos 1.3 y 2.1b)
 │   ├── difusion.py      → empuja el estado a los paneles conectados por WS (paso 1.4)
-│   ├── modelos.py       → modelos de dominio (hoy: Tick). No sabe de exchanges ni de BD
+│   ├── modelos.py       → modelos de dominio (Tick, Vela). No sabe de exchanges ni de BD
 │   ├── ingesta/
 │   │   ├── binance.py   → escucha el WebSocket de Binance y emite Ticks (paso 1.1)
-│   │   └── almacen.py   → EscritorDeTicks: junta ticks y los guarda por lotes (paso 1.2)
+│   │   ├── almacen.py   → EscritorDeTicks: junta ticks y los guarda por lotes (paso 1.2)
+│   │   └── backfill.py  → baja de la REST de Binance la historia que Argos no vivió (paso 2.1b)
 │   └── main.py          → la app FastAPI; endpoints + arranque de las tareas de fondo
 ├── sql/
-│   └── 001_ticks.sql    → tabla `ticks` como hypertable + índices
-├── pyproject.toml       → dependencias (fastapi, uvicorn, asyncpg, pydantic-settings, websockets)
+│   ├── 001_ticks.sql            → tabla `ticks` como hypertable + índices
+│   └── 002_velas_historicas.sql → velas de 1m traídas de Binance (la historia que nos perdimos)
+├── pyproject.toml       → dependencias (fastapi, uvicorn, asyncpg, pydantic-settings, websockets, httpx)
 ├── uv.lock              → lockfile de uv
 └── .python-version      → fija Python 3.13 (NO usar el 3.14 del sistema: faltan wheels)
 ```
@@ -147,8 +149,39 @@ Cada tick que entra va a **dos lugares distintos, con propósitos distintos**:
 - **Se calcula en cada consulta**. Simple y siempre al día. Cuando haya mucha historia y se pidan rangos
   largos, el reemplazo natural son las *continuous aggregates* de Timescale (velas pre-calculadas que se
   refrescan solas).
-- **Argos solo tiene lo que vio**: no hay historia anterior al primer arranque y no se inventa. Traer
-  historia vieja desde la API REST de Binance (backfill) es un paso posterior.
+**La historia que Argos no vivió: el backfill** (decidido en el paso 2.1b)
+
+Argos solo puede armar velas de los minutos que escuchó. Antes de su primer arranque no hay nada, y cada
+apagón deja un hueco — se medía **12,6 % de cobertura** cuando se detectó. Eso se ve feo en el gráfico
+(el eje de tiempo pega saltos) pero el problema serio es otro: los detectores de la Fase 3 comparan lo de
+ahora contra lo que es *normal*, y sin historia no hay normal.
+
+- **Se traen las velas oficiales de Binance** (`GET /api/v3/klines`, sin API key). No es inventar datos:
+  son exactamente los minutos que nos perdimos, contados por el mismo exchange que ya escuchamos. Es la
+  misma fuente con la que verificamos nuestras velas en el paso 1.3.
+- **Tabla aparte, no dentro de `ticks`**. Una kline **no es un tick**: ya viene resumida. Meterla en
+  `ticks` obligaría a fabricar operaciones con precios, cantidades e ids falsos, y eso envenenaría a los
+  detectores de volumen, que cuentan operaciones. Van en `velas_historicas`, separadas y sin disfraz.
+- **Solo se descarga 1 minuto.** El resto (5m, 15m, 1h, 4h, 1d) se agrega, igual que con los ticks. Bajar
+  seis intervalos sería seis veces más disco y seis oportunidades de desincronizarse.
+- **La vela en curso nunca se guarda.** Si el rango llega hasta ahora, la última kline que manda Binance
+  se está formando: congelarla sería dar por firme algo a medio hacer, y encima le ganaría a nuestros
+  ticks en vivo, que de ese minuto saben más.
+- **Regla de desempate al fusionar**: para un **minuto cerrado manda la vela de Binance** (incluye todas
+  las operaciones; la nuestra puede estar mocha si Argos arrancó a mitad de minuto), y el **minuto en
+  curso siempre es nuestro**. Medido: de 119 minutos comparables, 112 daban OHLC idéntico; los 7 que no,
+  eran justamente minutos de borde —arranque o apagado— que es lo que esta regla repara.
+- **Cada vela dice de dónde salió** (`fuente`: `propia` / `historia` / `mixta`). No se disimula la mezcla,
+  porque `operaciones` no se cuenta igual: en las nuestras son `aggTrade` (agrupadas) y en las históricas
+  son las operaciones reales, siempre más. Los dos números son correctos pero no son comparables.
+- **Se va despacio a propósito**: se mira la cabecera `x-mbx-used-weight-1m` y se frena antes del techo;
+  si igual llega un 429/418 se respeta el `Retry-After`. Misma lección del paso 1.1. Los símbolos se bajan
+  **en serie**, no en paralelo: el límite es por IP, así que hacerlo a la vez no acelera nada, solo gasta
+  el presupuesto al doble.
+- **Es incremental**: solo pide lo que falta en los bordes (más atrás o más adelante de lo que ya hay).
+  Reejecutarlo no duplica nada — el índice único + `ON CONFLICT DO NOTHING` se encargan.
+- **El piso de las consultas no usa `now()`** sino el dato más nuevo que exista del símbolo. Si Argos
+  estuvo apagado dos días, un piso calculado desde "ahora" dejaría fuera todo lo que sí tenemos.
 
 **Cómo llega el dato al panel** (decidido en el paso 1.4):
 
