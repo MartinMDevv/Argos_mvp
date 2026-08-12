@@ -65,6 +65,14 @@ Verificar:
               print(m['tipo'], m.get('simbolos', ''))
   asyncio.run(main())"
   ```
+- http://localhost:8000/detectores → qué vigila Argos y con qué cadencia, más el pulso del motor.
+  Si escribiste un detector en `app/detectores/` y **no aparece acá**, no se registró: lo más
+  probable es que le falte el decorador `@registrar`. Mirá también `silenciadas`: son alertas
+  correctas que repetían algo ya dicho, así que un número alto es el antirruido funcionando.
+- http://localhost:8000/alertas → lo que Argos vio, de lo más nuevo a lo más viejo.
+  Filtrable: `?simbolo=BTCUSDT`, `?detector=umbral_precio`, `?limite=100`.
+  Cada alerta trae su `evidencia`: los números crudos con los que el detector concluyó, para que
+  puedas rehacer la cuenta.
 - http://localhost:8000/docs → documentación interactiva (Swagger)
 
 > **Desde el paso 1.2 la API se conecta sola a Binance al arrancar** y empieza a guardar ticks.
@@ -72,6 +80,26 @@ Verificar:
 > ```bash
 > INGESTA_ACTIVA=false uv run uvicorn app.main:app --reload --port 8000
 > ```
+>
+> Desde el 3.1 hay un interruptor equivalente para la detección, si querés que la ingesta y el panel
+> sigan andando pero nadie evalúe ni escriba alertas:
+> ```bash
+> DETECCION_ACTIVA=false uv run uvicorn app.main:app --reload --port 8000
+> ```
+
+### Correr las pruebas (paso 3.1)
+
+```bash
+cd backend
+uv run pytest              # todo (57 pruebas, ~0,06 s)
+uv run pytest -v           # con el nombre de cada una
+uv run pytest pruebas/test_silencio.py    # un solo archivo
+```
+
+**No hace falta Docker ni internet**, y eso no es un detalle de comodidad: los detectores están
+diseñados como funciones puras de su contexto justamente para que se puedan probar así (y, más
+adelante, correr sobre la historia para medir si aciertan). Si algún día una prueba de detectores
+empieza a necesitar la base, hay que mirar qué se rompió en el diseño antes de levantarla.
 
 ### Traer la historia que Argos no vivió (paso 2.1b)
 

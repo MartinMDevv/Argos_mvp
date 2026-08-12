@@ -10,8 +10,13 @@ Mercado:
     GET  /mercado/resumen → precio + cambio % (1h/24h/7d) + máx/mín/volumen 24h   (paso 2.2)
     WS   /ws/mercado      → el backend EMPUJA los precios en vivo                 (paso 1.4)
 
+Alertas:
+    GET  /detectores      → qué vigila Argos y con qué cadencia                   (paso 3.1)
+    GET  /alertas         → lo que Argos vio, de lo más nuevo a lo más viejo      (paso 3.1)
+
 Desde el paso 1.2, al arrancar la API se encienden tareas de fondo que corren para siempre:
-escuchar Binance, guardar en TimescaleDB y (desde 1.4) difundir a los paneles conectados.
+escuchar Binance, guardar en TimescaleDB, difundir a los paneles conectados (1.4) y, desde
+el 3.1, evaluar los detectores y guardar las alertas que emitan.
 """
 
 import asyncio
@@ -27,6 +32,9 @@ from fastapi.responses import JSONResponse
 
 from app.config import obtener_settings
 from app.db import abrir_pool, cerrar_pool, revisar_conexion
+from app.detectores import almacen as almacen_de_alertas
+from app.detectores import registro as registro_de_detectores
+from app.detectores.motor import MotorDeDetectores
 from app.difusion import GestorDeConexiones, emitir_estado
 from app.esquema import aplicar_esquema
 from app.estado import EstadoMercado
@@ -43,6 +51,17 @@ logger = logging.getLogger(__name__)
 estado_mercado = EstadoMercado()
 escritor_de_ticks = EscritorDeTicks()
 gestor_de_paneles = GestorDeConexiones()
+
+# Los detectores se descubren al importar este módulo: cada archivo de `app/detectores/`
+# se importa y sus clases decoradas con `@registrar` quedan en el catálogo. Si alguno
+# está mal definido, revienta acá — al arrancar, con un mensaje claro — y no a las tres
+# de la mañana dejando de emitir una alerta en silencio.
+registro_de_detectores.descubrir()
+motor_de_alertas = MotorDeDetectores(
+    estado=estado_mercado,
+    detectores=registro_de_detectores.crear(),
+    simbolos=SIMBOLOS_MVP,
+)
 
 
 @asynccontextmanager
@@ -70,16 +89,37 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         async def consumir(tick: Tick) -> None:
             """Qué hacemos con cada operación que llega del mercado.
 
-            Dos destinos, a propósito separados: la memoria guarda el AHORA (para responder
-            al instante) y la base guarda la HISTORIA (para tener con qué comparar).
+            Tres destinos, a propósito separados: la memoria guarda el AHORA (para responder
+            al instante), la base guarda la HISTORIA (para tener con qué comparar) y los
+            detectores miran el tick por si hay algo que contar (paso 3.1).
+
+            Las tres son instantáneas: ninguna espera al disco ni a la red. Encolar y
+            comparar en memoria es todo lo que se hace acá, porque este consumidor está
+            en la ruta caliente del WebSocket y atrasarlo atrasa la ingesta entera.
             """
             estado_mercado.actualizar(tick)
             escritor_de_ticks.encolar(tick)
+
+            if settings.deteccion_activa:
+                motor_de_alertas.revisar_tick(tick)
 
         tareas.append(asyncio.create_task(escuchar_ticks(consumir), name="ingesta-binance"))
         tareas.append(asyncio.create_task(escritor_de_ticks.correr(), name="escritor-ticks"))
     else:
         logger.info("Ingesta desactivada (INGESTA_ACTIVA=false)")
+
+    # Las dos tareas de fondo de la detección: la que mira los cierres de vela y la que
+    # va guardando las alertas emitidas. La ruta rápida no necesita tarea propia porque
+    # cuelga del consumidor de la ingesta, ahí arriba.
+    if settings.deteccion_activa:
+        tareas.append(
+            asyncio.create_task(motor_de_alertas.vigilar_velas(), name="detectores-velas")
+        )
+        tareas.append(
+            asyncio.create_task(motor_de_alertas.despachar(), name="detectores-despacho")
+        )
+    else:
+        logger.info("Detección desactivada (DETECCION_ACTIVA=false)")
 
     # La difusión se enciende igual, haya ingesta o no: si no hay novedades simplemente no
     # manda nada, y así un panel conectado no se queda esperando un socket que nunca abrió.
@@ -105,6 +145,16 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
                 logger.info("Volcado final: %d ticks guardados antes de cerrar", guardados)
         except Exception as error:
             logger.warning("No se pudo hacer el volcado final: %s", error)
+
+    if settings.deteccion_activa:
+        try:
+            alertas_guardadas = await motor_de_alertas.volcar()
+            if alertas_guardadas:
+                logger.info(
+                    "Volcado final: %d alertas guardadas antes de cerrar", alertas_guardadas
+                )
+        except Exception as error:
+            logger.warning("No se pudo guardar las alertas pendientes: %s", error)
 
     await cerrar_pool()
 
@@ -312,6 +362,88 @@ async def mercado_resumen(
             "simbolos": {
                 simbolo: resumen_a_json(resumen) for simbolo, resumen in resumenes.items()
             },
+        }
+    )
+
+
+@app.get("/detectores")
+def listar_detectores() -> dict[str, object]:
+    """Qué vigila Argos ahora mismo, y con qué cadencia (paso 3.1).
+
+    Es el catálogo de plugins registrados: si escribiste un detector nuevo en
+    `app/detectores/` y no aparece acá, es que no se registró (¿le falta el decorador
+    `@registrar`?). `motor` es el pulso del sistema de detección:
+
+    - `emitidas` — cuántas alertas se dispararon desde que arrancó el proceso.
+    - `silenciadas` — cuántas eran correctas pero repetían algo ya dicho. Es el
+      antirruido trabajando; que sea alto no es un problema, es el punto.
+    - `en_espera` — alertas emitidas que todavía no llegaron al disco. Debería ser 0
+      casi siempre; si crece, la base no está recibiendo.
+    - `fallos_de_detector` — un detector que reventó al evaluar. Cualquier número
+      distinto de 0 acá merece una mirada al log.
+    """
+    return {
+        "activa": obtener_settings().deteccion_activa,
+        "detectores": [
+            registro_de_detectores.ficha(clase)
+            for clase in registro_de_detectores.catalogo().values()
+        ],
+        "motor": motor_de_alertas.resumen(),
+    }
+
+
+@app.get("/alertas")
+async def listar_alertas(
+    limite: int = Query(default=50, ge=1, le=500, description="Cuántas devolver."),
+    simbolo: str | None = Query(default=None, description="Filtrar por par."),
+    detector: str | None = Query(default=None, description="Filtrar por detector."),
+) -> JSONResponse:
+    """Lo que Argos vio, de lo más nuevo a lo más viejo (paso 3.1).
+
+    Cada alerta viaja con su `evidencia`: los números crudos con los que el detector
+    llegó a esa conclusión. Está para que puedas rehacer la cuenta — la regla de oro
+    del proyecto es que Argos no afirma nada que no se pueda verificar.
+
+    Ojo con `severidad`: mide qué tan notable es el hallazgo para el detector que lo
+    emitió, no si conviene comprar o vender. Argos informa; decidís vos.
+    """
+    if simbolo is not None and simbolo not in SIMBOLOS_MVP:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "simbolo_no_vigilado",
+                "detalle": f"Argos todavía no vigila '{simbolo}'.",
+                "disponibles": list(SIMBOLOS_MVP),
+            },
+        )
+
+    if detector is not None and detector not in registro_de_detectores.catalogo():
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "detector_desconocido",
+                "detalle": f"No hay ningún detector llamado '{detector}'.",
+                "disponibles": sorted(registro_de_detectores.catalogo()),
+            },
+        )
+
+    try:
+        alertas = await almacen_de_alertas.ultimas(limite, simbolo, detector)
+    except Exception as error:
+        logger.warning("No se pudieron leer las alertas: %s", error)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "sin_conexion",
+                "detalle": str(error),
+                "pista": "¿Está levantada la base? Probá GET /health/db",
+            },
+        ) from error
+
+    return JSONResponse(
+        content={
+            "cantidad": len(alertas),
+            "alertas": [almacen_de_alertas.alerta_a_json(alerta) for alerta in alertas],
         }
     )
 

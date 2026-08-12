@@ -111,7 +111,35 @@ de 4,5:1 de WCAG y era el color de casi todas las etiquetas: la escala de tintas
 escalones con **`--ghost` reservado para lo que NO es información**. Detalle y tabla de contrastes en
 `ARQUITECTURA.md` → "La escala de tintas, medida". ⚠️ Ojo con esa skill: su `--design-system` devuelve
 patrones de *landing page* y no sirve para Argos — lo útil son sus dominios `ux`, `react` y `chart`.
-**Siguiente: 3.1 (framework de detectores: clase base + registro de plugins).**
+**3.1 HECHO (framework de detectores)**: paquete `app/detectores/` — `base.py` (clase `Detector`,
+`ContextoDeEvaluacion`, las dos cadencias), `registro.py` (`@registrar` + descubrimiento automático de
+la carpeta: **crear el archivo ES darlo de alta**, no hay lista que mantener), `silencio.py`, `motor.py`,
+`almacen.py`. Modelo `Alerta` en `modelos.py`, tabla en `sql/003_alertas.sql` (**tabla normal, no
+hypertable**: las alertas son pocas por diseño), endpoints `GET /detectores` y `GET /alertas`, ajuste
+`DETECCION_ACTIVA`. **Decisión de fondo: un detector es una función pura de su contexto** — `evaluar()`
+no es `async` y no toca la BD; recibe todo cargado y devuelve `Alerta | None`. Motivo fuerte: la v2.0
+pide backtesting de las propias alertas, y un detector que sale a buscar datos mira el "ahora" y no se
+puede rebobinar. Si mañana hace falta una fuente nueva, la carga el MOTOR y la agrega al contexto.
+**Dos cadencias = las dos capas del spec**: `POR_TICK` cuelga del consumidor de la ingesta (sin `await`,
+sin BD) y `POR_VELA_CERRADA` es tarea de fondo que despierta cada 5 s a preguntar si cerró vela. El
+registro **rechaza al arrancar** un `POR_TICK` que pida historia (se callaría para siempre sin que se
+note). **El antirruido vive en el motor, no en cada detector**: agrupa por la `clave` de la alerta (la
+identidad de la SITUACIÓN) y se precarga desde la tabla al arrancar — sin eso, reiniciar sería saltarse
+el silencio, y con `--reload` pasaría en cada cambio de código. Toda alerta viaja con `evidencia` (los
+números crudos, como texto): la regla de oro hecha estructura. Emitir y guardar están separados por una
+cola con reintento. **Verificado**: 35 comprobaciones sin BD ni red; en vivo 230 ticks → 4 alertas +
+226 silenciadas; con TimescaleDB caída 25 s, 2 alertas en cola, `/alertas` 503 con mensaje, y al volver
+entraron solas (14 emitidas = 14 guardadas, 0 descartadas). ⚠️ `detectores/humo.py` son dos andamios de
+verificación y **se borran en el 3.2**.
+**3.1b HECHO (primeras pruebas del proyecto, no estaba en el plan)**: `backend/pruebas/` con pytest en
+el grupo `dev` del pyproject (no toca las dependencias de producción). **57 pruebas en 0,06 s, sin
+Docker ni internet** — verificado apuntando `POSTGRES_HOST` a un host inexistente. Que no necesiten la
+base ES la comprobación del diseño: si una prueba de detectores empieza a pedirla, mirar qué se rompió
+antes de levantarla. Dos decisiones a no deshacer: (a) **las pruebas definen sus propios detectores**
+(en `conftest.py`) y no usan los de `humo.py`, que se borra en el 3.2; (b)
+`test_todos_los_detectores_de_verdad_cumplen_las_reglas` recorre la carpeta **sin nombrar a nadie** y
+verifica los invariantes, así que cubre gratis a cada detector futuro. Correr: `cd backend && uv run pytest`.
+**Siguiente: 3.2 (alerta #1, umbral de precio: el primer detector real).**
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.

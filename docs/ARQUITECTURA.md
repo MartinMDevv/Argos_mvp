@@ -37,16 +37,30 @@ backend/
 │   ├── velas.py         → arma velas OHLCV; fusiona ticks propios + historia (pasos 1.3 y 2.1b)
 │   ├── resumen.py       → precio + cambio % (1h/24h/7d) + máx/mín/volumen del día (paso 2.2)
 │   ├── difusion.py      → empuja el estado a los paneles conectados por WS (paso 1.4)
-│   ├── modelos.py       → modelos de dominio (Tick, Vela, Cambio, ResumenSimbolo). No sabe de
-│   │                      exchanges ni de BD
+│   ├── modelos.py       → modelos de dominio (Tick, Vela, Alerta, Cambio, ResumenSimbolo). No
+│   │                      sabe de exchanges ni de BD
 │   ├── ingesta/
 │   │   ├── binance.py   → escucha el WebSocket de Binance y emite Ticks (paso 1.1)
 │   │   ├── almacen.py   → EscritorDeTicks: junta ticks y los guarda por lotes (paso 1.2)
 │   │   └── backfill.py  → baja de la REST de Binance la historia que Argos no vivió (paso 2.1b)
+│   ├── detectores/      → cada alerta es un plugin: agregar = enchufar (paso 3.1)
+│   │   ├── base.py      → clase Detector + ContextoDeEvaluacion + las dos cadencias
+│   │   ├── registro.py  → decorador @registrar + descubrimiento automático de la carpeta
+│   │   ├── silencio.py  → el antirruido: cuándo callarse aunque haya algo que decir
+│   │   ├── motor.py     → quién pregunta, cuándo, y qué hace con la respuesta
+│   │   ├── almacen.py   → guarda y lee alertas en la tabla `alertas`
+│   │   └── humo.py      → ⚠️ andamios de verificación del 3.1; SE BORRAN en el paso 3.2
 │   └── main.py          → la app FastAPI; endpoints + arranque de las tareas de fondo
 ├── sql/
 │   ├── 001_ticks.sql            → tabla `ticks` como hypertable + índices
-│   └── 002_velas_historicas.sql → velas de 1m traídas de Binance (la historia que nos perdimos)
+│   ├── 002_velas_historicas.sql → velas de 1m traídas de Binance (la historia que nos perdimos)
+│   └── 003_alertas.sql          → tabla `alertas` (tabla normal, NO hypertable: son pocas por diseño)
+├── pruebas/             → pytest. Ninguna necesita Docker ni internet (paso 3.1)
+│   ├── conftest.py      → fábricas de datos + detectores de mentira + aislamiento del registro
+│   ├── test_registro.py → que un detector mal definido reviente AL ARRANCAR
+│   ├── test_contexto.py → qué ve un detector, y qué pasa cuando no hay nada que ver
+│   ├── test_alertas.py  → la clave (antirruido), la evidencia (regla de oro), la severidad
+│   └── test_silencio.py → el antirruido al detalle, incluidos los bordes
 ├── pyproject.toml       → dependencias (fastapi, uvicorn, asyncpg, pydantic-settings, websockets, httpx)
 ├── uv.lock              → lockfile de uv
 └── .python-version      → fija Python 3.13 (NO usar el 3.14 del sistema: faltan wheels)
@@ -237,6 +251,55 @@ backend le **avisa**. Es el mismo trato que tenemos con Binance, un escalón má
 - **CORS**: el navegador bloquea pedidos entre orígenes distintos, y el frontend vive en el 5173 mientras
   la API está en el 8000. Se autorizan solo los orígenes de desarrollo — nunca `"*"`, que abriría la API
   a cualquier página.
+
+### Los detectores: por qué son plugins y no una lista (paso 3.1)
+
+El corazón de la Fase 3, y el lugar donde el spec pone la escalabilidad del proyecto. La forma obvia
+de sumar detectores sería una lista en el arranque; se descartó porque con esa lista agregar una
+alerta son dos cambios en dos archivos y el motor termina conociendo a todos los detectores
+concretos. Acá es un decorador (`@registrar`) más un descubrimiento automático de la carpeta:
+**crear el archivo es darlo de alta**, y no hay ninguna lista que mantener.
+
+- **Un detector es una función pura de su contexto.** `evaluar()` no es `async` y no toca la base:
+  recibe un `ContextoDeEvaluacion` ya cargado y devuelve `Alerta | None`. No es comodidad, es lo que
+  hace posibles tres cosas: probarlo sin Docker, **correrlo sobre la historia** (la v2.0 pide
+  backtesting de las propias alertas, y un detector que sale a buscar datos no se puede rebobinar) y
+  no multiplicar consultas — el motor trae los datos una vez y los reparte entre todos.
+- **Dos cadencias, que son las dos capas del spec.** `POR_TICK` cuelga de la ingesta y corre en la
+  ruta caliente: sin `await`, sin base, para que un umbral de precio salte al cruzar. `POR_VELA_CERRADA`
+  es una tarea de fondo que despierta cada 5 s y pregunta si cerró una vela nueva: un z-score sobre
+  1.440 minutos de historia no da otra respuesta si se lo consulta 40 veces por segundo. El registro
+  **rechaza al arrancar** un detector `POR_TICK` que pida historia, porque se callaría para siempre
+  sin que nadie se entere.
+- **El antirruido vive en el motor, no en cada detector.** Si el volumen de BTC está a 3,4σ ahora, va a
+  seguir estándolo el minuto que viene: son detecciones correctas y son la misma noticia. El
+  `Silencio` agrupa por la `clave` de la alerta (la identidad de la *situación*) y cada detector
+  elige cuánto dura su espera. Medido en vivo: **230 ticks evaluados → 4 alertas y 226 silenciadas**.
+  Al arrancar, el silencio se **precarga desde la tabla `alertas`**: sin eso, reiniciar sería una
+  forma de saltarse el antirruido, y con `--reload` puesto pasaría en cada cambio de código.
+- **Toda alerta viaja con su `evidencia`**: los números crudos con los que el detector concluyó, como
+  texto. Es la regla de oro hecha estructura — quien la reciba puede rehacer la cuenta. Es también lo
+  que va a permitir que la v1.2 vuelva sobre una alerta vieja y anote qué pasó después.
+- **Emitir y guardar están separados.** La detección ocurre en la ruta caliente, donde un `INSERT`
+  frenaría la ingesta; las alertas van a una cola y una tercera tarea las escribe, con reintento si la
+  base no está. Verificado tirando TimescaleDB 25 s: 2 alertas quedaron esperando, `/alertas` devolvió
+  503 con mensaje (no un stacktrace) y al volver la base entraron solas — 14 emitidas, 14 guardadas,
+  0 descartadas.
+- **`sql/003_alertas.sql` NO es una hypertable**, a diferencia de `ticks` y `velas_historicas`. Las
+  alertas son pocas por diseño; si algún día hicieran falta particiones por tiempo, el problema no
+  sería la tabla sino que Argos se volvió el ruido del que quería protegerte.
+
+**Las pruebas** (`backend/pruebas/`, `uv run pytest`) — 57 y corren en 0,06 s. Que ninguna necesite
+Docker ni internet **es** la comprobación del diseño: si mañana una prueba de detectores empieza a
+pedir la base, la pregunta no es cómo levantarla, es qué se rompió. Dos decisiones que conviene no
+deshacer:
+
+- **Las pruebas definen sus propios detectores** en vez de usar los de `humo.py`. Los de humo son
+  andamios que se borran en el 3.2, y una prueba que dependiera de ellos se rompería ese día por un
+  motivo que no tiene nada que ver con lo que prueba.
+- **`test_todos_los_detectores_de_verdad_cumplen_las_reglas`** recorre lo que haya en la carpeta y
+  verifica los invariantes sin nombrar a nadie. Es la red que cubre gratis a cada detector que se
+  escriba de acá en adelante — incluidos los cuatro del MVP, que todavía no existen.
 
 ## 🖥️ frontend/ — React 19 + Vite + Tailwind v4 (TypeScript)
 

@@ -136,6 +136,66 @@ class Vela:
 
 
 @dataclass(frozen=True, slots=True)
+class Alerta:
+    """Algo que Argos vio y decidió contar. La salida de un detector (paso 3.1).
+
+    ## Por qué viaja con la evidencia
+    La regla de oro del proyecto dice que Argos no inventa números. Una alerta que
+    dice "volumen anómalo en BTC" y nada más es exactamente lo que la regla prohíbe:
+    una afirmación sin con qué comprobarla. Por eso toda alerta lleva `evidencia`, que
+    son los números crudos con los que el detector llegó a esa conclusión — el valor
+    medido, la media contra la que lo comparó, la desviación, el umbral cruzado.
+
+    Con eso, quien la reciba —vos, el panel, la IA de la Fase 5— puede rehacer la
+    cuenta. Y cuando llegue la v1.2 y haya que medir si las alertas acertaron, la
+    evidencia es lo que permite volver sobre una alerta vieja y entender qué vio.
+
+    `frozen=True` porque una alerta es un hecho: se emitió en un momento, con unos
+    números. Corregirla después sería reescribir la historia.
+    """
+
+    detector: str
+    """Qué plugin la emitió (`Detector.nombre`). Ej: `umbral_precio`."""
+
+    simbolo: str
+    """Par sobre el que se emitió. Ej: `BTCUSDT`."""
+
+    momento: datetime
+    """Cuándo la emitió el detector, en UTC. **No** es lo mismo que el momento del
+    dato que la disparó: ese, si importa, va adentro de `evidencia`."""
+
+    severidad: str
+    """Cuánto pide tu atención: `info`, `aviso` o `fuerte`.
+
+    Es del detector, no del mercado: mide qué tan seguro y qué tan notable es el
+    hallazgo, no si conviene comprar o vender. Argos informa, no aconseja."""
+
+    titulo: str
+    """El encabezado corto, sin números. Ej: "Volumen anómalo"."""
+
+    detalle: str
+    """Una frase que cuenta qué pasó, con los números adentro.
+    Ej: "Pico de 3,4σ sobre la media de 24 h"."""
+
+    evidencia: dict[str, str]
+    """Los números crudos que sostienen la alerta, como texto (mismo motivo que en
+    `estado.py`: pasarlos a float los deformaría). Cada detector pone los suyos."""
+
+    clave: str
+    """La identidad de la SITUACIÓN, no de esta alerta puntual.
+
+    Dos alertas con la misma clave cuentan lo mismo aunque se emitan con un minuto
+    de diferencia: "el z-score de volumen de BTC está alto" sigue siendo la misma
+    noticia el segundo minuto y el tercero. Es la llave con la que el silencio
+    (`detectores/silencio.py`) decide callarse, y es lo que separa a Argos de un
+    bot que te manda sesenta mensajes idénticos por hora."""
+
+    id: int | None = None
+    """El identificador de la fila en la base. `None` mientras la alerta está recién
+    emitida y todavía no se guardó; con número cuando se leyó de vuelta."""
+
+
+@dataclass(frozen=True, slots=True)
 class Cambio:
     """Cuánto se movió el precio respecto de un momento anterior. El "+1,84%" del panel.
 

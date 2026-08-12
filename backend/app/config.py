@@ -49,6 +49,12 @@ class Settings(BaseSettings):
     # cambio de código. Se apaga poniendo INGESTA_ACTIVA=false en el entorno.
     ingesta_activa: bool = True
 
+    # --- Detección de alertas (Fase 3) ---
+    # Si está en false, los detectores no corren: la ingesta y el panel siguen igual,
+    # pero nadie evalúa ni emite alertas. Sirve para trabajar en otra cosa sin llenar
+    # la tabla `alertas`, y para apagar la detección si algún detector se desboca.
+    deteccion_activa: bool = True
+
     # --- Pool de conexiones ---
     # Cuántas conexiones mantiene abiertas y reciclando (abrir una cuesta caro).
     db_pool_min: int = 2

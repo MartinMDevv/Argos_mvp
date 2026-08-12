@@ -11,3 +11,15 @@ dependencies = [
     "websockets>=14",     # cliente WebSocket async (ingesta en vivo de Binance)
     "httpx>=0.28",        # cliente HTTP async (backfill de historia desde la REST de Binance)
 ]
+
+# Dependencias que solo hacen falta para desarrollar, no para correr Argos.
+# `uv run pytest` las instala solo la primera vez.
+[dependency-groups]
+dev = [
+    "pytest>=8.3",        # las pruebas de pruebas/ (paso 3.1)
+]
+
+[tool.pytest.ini_options]
+testpaths = ["pruebas"]
+# Para que las pruebas puedan hacer `from app...` sin instalar el paquete.
+pythonpath = ["."]

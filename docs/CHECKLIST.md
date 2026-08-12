@@ -94,7 +94,28 @@ TimescaleDB → velas → empujado al panel.
   32×28 px con el activo en teal. Ver ARQUITECTURA.md → "La escala de tintas, medida".)*
 
 ## FASE 3 — Detectores de alertas (el corazón)
-- [ ] **3.1** Framework de detectores (clase base + registro de plugins)
+- [x] **3.1** Framework de detectores (clase base + registro de plugins) ✅
+  *(Paquete `app/detectores/`: `base.py` (clase `Detector` + `ContextoDeEvaluacion` + las dos
+  cadencias), `registro.py` (decorador `@registrar` + descubrimiento automático de la carpeta —
+  **crear el archivo es darlo de alta**), `silencio.py` (antirruido), `motor.py` y `almacen.py`.
+  Modelo `Alerta` en `modelos.py` y tabla en `sql/003_alertas.sql`. Endpoints `GET /detectores`
+  y `GET /alertas`. **Decisión de fondo: un detector es una función pura de su contexto** —
+  `evaluar()` no es async y no toca la base, porque así se puede probar sin Docker y, sobre todo,
+  correr sobre la historia (la v2.0 pide backtesting, y un detector que sale a buscar datos no se
+  puede rebobinar). **Verificado**: en vivo, 230 ticks evaluados → 4 alertas y 226 silenciadas; y
+  tirando TimescaleDB 25 s las alertas quedaron en cola y entraron solas al volver (14 emitidas =
+  14 guardadas, 0 descartadas). ⚠️ `humo.py` son dos andamios de verificación y **se borran en el
+  3.2**.)*
+- [x] **3.1b** Primeras pruebas automatizadas del proyecto ✅
+  *(No estaba en el plan: salió de que el 3.1 se verificó con un script suelto que se iba a perder.
+  `backend/pruebas/` con pytest (grupo `dev` del `pyproject`, no toca las dependencias de
+  producción): **57 pruebas en 0,06 s, sin Docker ni internet** — comprobado apuntando la config a
+  un host inexistente. Cubren el registro (que un detector mal definido reviente **al arrancar**),
+  el contexto y sus huecos, la clave y la evidencia de las alertas, y el silencio con sus bordes
+  (ventana exacta, ventana en cero, precarga tras reinicio). **Las pruebas definen sus propios
+  detectores** en vez de usar los de `humo.py`, para que no se rompan cuando lo borremos. Y
+  `test_todos_los_detectores_de_verdad_cumplen_las_reglas` recorre la carpeta sin nombrar a nadie:
+  cubre gratis a los cuatro detectores del MVP que todavía no existen.)*
 - [ ] **3.2** Alerta #1 Umbral de precio
 - [ ] **3.3** Alerta #2 Movimiento % en ventana
 - [ ] **3.4** Alerta #3 Volatilidad anómala (z-score) *(ya con algo de historia)*
@@ -134,11 +155,11 @@ de cada una está en el [spec, §2.F](../../spec-crypto-monitor.md).
 
 ---
 
-**👉 Estamos aquí:** **Fases 0 y 1 cerradas + 2.1 y 2.1b hechos.** El backend ve el mercado, lo guarda,
-lo resume en velas y lo empuja en vivo; el gráfico del Panel lo dibuja con datos reales moviéndose solo;
-y con el backfill ya no tiene huecos: hay un año de historia real detrás. Siguiente: **2.2 — watchlist y
-panel de estado con datos reales** (precio y cambio %), más el selector de moneda e intervalo, que jubila
-lo que queda de `src/data/coins.ts`.
+**👉 Estamos aquí:** **Fases 0, 1 y 2 cerradas + 3.1 hecho.** El backend ve el mercado, lo guarda, lo
+resume en velas y lo empuja en vivo; el panel entero usa datos reales; y desde el 3.1 existe el enchufe
+donde van las alertas: hay un motor corriendo, un antirruido que ya se puede medir y una tabla donde
+queda registrado lo que Argos vio. Todavía no vigila nada de verdad — los dos detectores que hay son
+andamios. Siguiente: **3.2 — Umbral de precio**, el primer detector real, que además jubila `humo.py`.
 
 ### Cómo levantar el frontend
 ```bash
