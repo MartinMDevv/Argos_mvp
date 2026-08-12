@@ -133,3 +133,76 @@ class Vela:
         if self.apertura == 0:
             return Decimal(0)
         return (self.cierre - self.apertura) / self.apertura * 100
+
+
+@dataclass(frozen=True, slots=True)
+class Cambio:
+    """Cuánto se movió el precio respecto de un momento anterior. El "+1,84%" del panel.
+
+    Es una comparación entre dos precios reales y concretos, no una tendencia ni una
+    estimación. Por eso viaja con el precio contra el que se comparó y con el momento
+    exacto de ese precio: quien lo lea puede rehacer la cuenta y verificarla.
+
+    Cuando no hay con qué comparar —falta historia de ese plazo— **no existe un `Cambio`**:
+    el plazo vale `None`. Un cero sería mentira (diría "no se movió") y un aproximado
+    también (diría "se movió esto" con más confianza de la que tenemos).
+    """
+
+    plazo: str
+    """Nombre del plazo comparado: `1h`, `24h` o `7d`."""
+
+    porcentaje: Decimal
+    """Variación porcentual entre `referencia` y el precio actual. Positivo = subió."""
+
+    referencia: Decimal
+    """El precio de entonces: el cierre del minuto usado como punto de partida."""
+
+    momento_referencia: datetime
+    """Cuándo cerró ese minuto, en UTC. Casi nunca cae exacto en el plazo pedido (el
+    minuto de hace 24 horas puede no tener operaciones), pero siempre cae dentro de la
+    tolerancia; si no, no habría `Cambio`."""
+
+
+@dataclass(frozen=True, slots=True)
+class ResumenSimbolo:
+    """La ficha de un activo: a cuánto está y cómo viene. Lo que alimenta la watchlist.
+
+    Junta las dos mitades de Argos que hasta ahora estaban separadas: el precio del
+    instante (memoria) y la historia con la que ese precio cobra sentido (TimescaleDB).
+    Un precio solo no dice nada; "64.284 y viene +1,8% en el día" ya es información.
+    """
+
+    simbolo: str
+
+    precio: Decimal
+    """El precio de referencia del resumen: contra este se calcularon los cambios."""
+
+    momento: datetime
+    """Cuándo es ese precio, en UTC. **Mirarlo siempre**: si Argos lleva rato apagado,
+    el precio es viejo y decirlo es la diferencia entre informar y engañar."""
+
+    origen_precio: str
+    """`vivo` si salió del último tick en memoria (segundos de antigüedad), `guardado`
+    si salió del último cierre de minuto en la base (la ingesta está apagada o caída)."""
+
+    cambios: dict[str, "Cambio | None"]
+    """Variación por plazo (`1h`, `24h`, `7d`). `None` = no había con qué comparar."""
+
+    maximo_24h: Decimal | None
+    minimo_24h: Decimal | None
+    """Techo y piso del día. `None` si no hay ni un minuto de datos en la ventana."""
+
+    volumen_24h: Decimal | None
+    """Cuánto se operó en 24h, en la moneda base (ej. BTC)."""
+
+    volumen_cotizado_24h: Decimal | None
+    """Cuánto dinero movió en 24h (ej. USDT). Este es el comparable entre activos."""
+
+    minutos_24h: int
+    """Cuántos de los 1.440 minutos del día tienen datos. Es el **medidor de confianza**
+    del bloque de 24h: con 1.440 el volumen es el real; con 300, es el de 300 minutos y
+    nada más. Se informa en vez de disimularse."""
+
+    fuente_24h: str | None
+    """De qué está hecha la ventana de 24h: `propia`, `historia` o `mixta`.
+    Mismo significado que en `Vela.fuente`, y la misma advertencia."""

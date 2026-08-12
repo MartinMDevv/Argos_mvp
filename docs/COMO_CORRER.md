@@ -48,6 +48,11 @@ Verificar:
   ingesta (`guardados` tiene que subir; `en_espera` tiene que mantenerse bajo)
 - http://localhost:8000/mercado/velas?simbolo=BTCUSDT&intervalo=1m&limite=20 → velas OHLCV
   (intervalos: `1m`, `5m`, `15m`, `1h`, `4h`, `1d`)
+- http://localhost:8000/mercado/resumen → precio + cambio % (1h/24h/7d) + máx/mín/volumen del día
+  de cada símbolo. Filtrable: `?simbolos=BTCUSDT&simbolos=ETHUSDT`.
+  **Si un plazo sale `null` es que falta historia de ese tramo** — no es un error: corré el backfill
+  (`uv run python -m app.ingesta.backfill --dias 365`). Mirá también `minutos_24h`: cuántos de los
+  1.440 minutos del día tienen datos. Con menos de 1.440, el volumen es el de esos minutos y nada más.
 - `ws://localhost:8000/ws/mercado` → canal en vivo. Para probarlo sin frontend:
   ```bash
   uv run python -c "

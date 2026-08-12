@@ -35,8 +35,10 @@ backend/
 │   ├── esquema.py       → aplica los .sql de sql/ al arrancar (idempotente)
 │   ├── estado.py        → EstadoMercado: último tick de cada símbolo, en memoria
 │   ├── velas.py         → arma velas OHLCV; fusiona ticks propios + historia (pasos 1.3 y 2.1b)
+│   ├── resumen.py       → precio + cambio % (1h/24h/7d) + máx/mín/volumen del día (paso 2.2)
 │   ├── difusion.py      → empuja el estado a los paneles conectados por WS (paso 1.4)
-│   ├── modelos.py       → modelos de dominio (Tick, Vela). No sabe de exchanges ni de BD
+│   ├── modelos.py       → modelos de dominio (Tick, Vela, Cambio, ResumenSimbolo). No sabe de
+│   │                      exchanges ni de BD
 │   ├── ingesta/
 │   │   ├── binance.py   → escucha el WebSocket de Binance y emite Ticks (paso 1.1)
 │   │   ├── almacen.py   → EscritorDeTicks: junta ticks y los guarda por lotes (paso 1.2)
@@ -182,6 +184,37 @@ ahora contra lo que es *normal*, y sin historia no hay normal.
   Reejecutarlo no duplica nada — el índice único + `ON CONFLICT DO NOTHING` se encargan.
 - **El piso de las consultas no usa `now()`** sino el dato más nuevo que exista del símbolo. Si Argos
   estuvo apagado dos días, un piso calculado desde "ahora" dejaría fuera todo lo que sí tenemos.
+
+**Cómo se calcula "cómo viene" un activo** (decidido en el paso 2.2):
+
+`GET /mercado/resumen` junta las dos mitades que hasta acá vivían separadas: el precio del instante
+(memoria) y la historia que le da sentido (TimescaleDB). Un precio suelto no informa nada; "63.831 y
+viene −0,36% en el día" ya es información. Es lo que alimenta la watchlist.
+
+- **El ancla no es `now()`, y tampoco alcanza con "el dato más nuevo de la base".** Es el momento del
+  dato más nuevo mirando las **tres** fuentes: ticks, historia y el tick vivo en memoria. El caso que
+  obliga a esto es silencioso: Argos lleva treinta segundos encendido después de dos días apagado. La
+  memoria tiene un precio de este segundo y la base llega hasta hace dos días; comparar uno contra otro
+  mostraría un cambio de **tres** días con la etiqueta "24h", y nadie se daría cuenta.
+- **Tolerancia por plazo, y `null` cuando no alcanza.** El minuto exacto de hace 24 horas puede no
+  existir, así que se toma el último cierre anterior al blanco. Si ese cierre quedó más lejos que la
+  tolerancia (5 min para 1h, 30 min para 24h, 3 h para 7d — alrededor del 2% del plazo), el cambio se
+  devuelve **`null`**: ya no representa el plazo pedido. Un cero diría "no se movió" y un aproximado
+  diría "se movió esto" con más confianza de la que hay. Regla de oro: Argos no rellena.
+- **Los ticks se escanean solo donde la historia oficial no llega.** 24 horas de ticks de BTC son medio
+  millón de filas, pero esos mismos minutos ya están calculados en `velas_historicas`. El piso del
+  escaneo de ticks es el último minuto que trajo el backfill, así que con el backfill al día se leen
+  minutos, no un día. **Medido con `EXPLAIN ANALYZE`: 1.766 filas de ticks en vez de ~500.000**, y entra
+  como condición del índice (*Index Only Scan*). No cambia ningún resultado: es la misma regla de
+  desempate de `velas.py` (para minuto cerrado manda Binance), solo cambia el trabajo que hace la base.
+- **`minutos_24h` viaja con el volumen.** Dice cuántos de los 1.440 minutos del día tienen datos. Sin
+  ese número, un volumen armado con 300 minutos se leería como el volumen del día. Se informa en vez de
+  disimularse — igual que `fuente` en las velas.
+- **Una consulta para todos los símbolos**, no una por símbolo: entran como arreglo (`unnest`). Con dos
+  da igual; con veinte en la watchlist, es una consulta contra veinte.
+- **Verificado contra Binance** (mismo método que en 1.3 y 2.1b): con cobertura completa, el máximo y el
+  mínimo de 24 h salen **idénticos al octavo decimal** a los de `/api/v3/ticker/24hr`, el volumen difiere
+  0,006% (nuestra ventana no arranca en el mismo segundo que la suya) y el cambio % a 0,01 pp.
 
 **Cómo llega el dato al panel** (decidido en el paso 1.4):
 

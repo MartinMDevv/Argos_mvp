@@ -56,8 +56,18 @@ TimescaleDB → velas → empujado al panel.
   de 1m; el resto se agrega. Verificado: en los minutos con cobertura continua nuestras velas y las
   de Binance son idénticas (112 de 119); las 7 que diferían eran minutos de borde —arranque o
   apagado— donde la nuestra estaba mocha, que es justo lo que la fusión repara.)*
-- [ ] **2.2** Watchlist BTC/ETH + panel de estado (precio, cambio %) *(y selector de moneda/intervalo:
-  el gráfico está fijo en BTCUSDT · 1m)*
+- [x] **2.2a** Backend del resumen: precio + cambio % (1h/24h/7d) + máx/mín/volumen del día ✅
+  *(`app/resumen.py` + `GET /mercado/resumen`. Junta las dos mitades que estaban separadas: el precio
+  de memoria y la historia de la base. **El ancla mira las TRES fuentes** —ticks, historia y el tick
+  vivo— porque con solo la base pasa esto: Argos lleva 30 s encendido tras dos días apagado, la
+  memoria tiene el precio de ahora y la base llega hasta hace dos días, y el "24h" mostraría un cambio
+  de tres días sin que se note. Cada plazo tiene **tolerancia**; si el cierre más cercano queda más
+  lejos, el cambio va `null` en vez de un aproximado. Los ticks se escanean solo desde donde termina el
+  backfill: medido con `EXPLAIN ANALYZE`, 1.766 filas en vez de ~500.000. Verificado contra
+  `/api/v3/ticker/24hr` de Binance: máx y mín idénticos al octavo decimal, volumen a 0,006%.)*
+- [ ] **2.2b** Watchlist BTC/ETH + cabecera del panel con datos reales *(jubila `src/data/coins.ts`,
+  que hoy tiene precios inventados) + selector de moneda/intervalo: el gráfico está fijo en
+  BTCUSDT · 1m y los botones `15m/1H/4H/1D` son decorativos*
 
 ## FASE 3 — Detectores de alertas (el corazón)
 - [ ] **3.1** Framework de detectores (clase base + registro de plugins)

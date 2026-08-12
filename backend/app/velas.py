@@ -212,17 +212,19 @@ async def obtener_velas(
             volumen=fila["volumen"],
             volumen_cotizado=fila["volumen_cotizado"],
             operaciones=fila["operaciones"],
-            fuente=_fuente(fila["toda_historia"], fila["algo_historia"]),
+            fuente=nombre_de_fuente(fila["toda_historia"], fila["algo_historia"]),
             completa=(fila["inicio"] + ancho) <= limite_completas,
         )
         for fila in filas
     ]
 
 
-def _fuente(toda_historia: bool, algo_historia: bool) -> str:
+def nombre_de_fuente(toda_historia: bool, algo_historia: bool) -> str:
     """Traduce las dos banderas de la consulta al nombre de la fuente.
 
     Ver `Vela.fuente` en `modelos.py` para qué significa cada una y por qué importa.
+    Es pública porque `resumen.py` usa las mismas dos banderas sobre la misma mezcla de
+    fuentes: si el nombre se decidiera dos veces, tarde o temprano se decidiría distinto.
     """
     if toda_historia:
         return "historia"

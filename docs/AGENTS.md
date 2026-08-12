@@ -78,7 +78,19 @@ Se descarga **solo 1m**; el resto se agrega. Regla de desempate: **minuto cerrad
 (la nuestra puede estar mocha si Argos arrancó a mitad); **minuto en curso → siempre nuestro**. Cada vela dice
 su `fuente` (`propia`/`historia`/`mixta`) porque `operaciones` NO se cuenta igual en ambas (aggTrades vs reales).
 Correr: `uv run python -m app.ingesta.backfill --simbolo BTCUSDT ETHUSDT --dias 365` (incremental).
-**Siguiente: 2.2.**
+**2.2a HECHO (backend del resumen)**: `app/resumen.py` + `GET /mercado/resumen` → precio, cambio %
+(1h/24h/7d), máx/mín y volumen del día. Junta memoria (el ahora) con la base (la historia). **El ancla
+mira las TRES fuentes** —ticks, historia y el tick vivo en memoria—: con Argos recién encendido tras dos
+días apagado, la memoria tiene el precio de ahora y la base llega a hace dos días, y un "24h" anclado en
+la base mostraría un cambio de tres días sin que se note. Cada plazo lleva **tolerancia** (5 min / 30 min
+/ 3 h ≈ 2% del plazo); si el cierre más cercano queda más lejos, el cambio va **`null`**, nunca cero ni
+aproximado. Los ticks se escanean **solo desde donde termina el backfill** (misma regla de desempate que
+`velas.py`): medido con `EXPLAIN ANALYZE`, 1.766 filas en vez de ~500.000, y entra como condición del
+índice. `minutos_24h` viaja con el volumen para que no se lea como el volumen del día cuando falta
+cobertura. Verificado contra `/api/v3/ticker/24hr`: máx/mín idénticos al octavo decimal, volumen a
+0,006%, cambio % a 0,01 pp. ⚠️ Los plazos están escritos a mano en dos lados (`PLAZOS` y `SQL_RESUMEN`).
+**Siguiente: 2.2b (watchlist + cabecera con datos reales, jubilar `src/data/coins.ts`, selector de
+moneda/intervalo).**
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.

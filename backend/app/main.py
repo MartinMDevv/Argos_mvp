@@ -7,6 +7,7 @@ Signos vitales:
 Mercado:
     GET  /mercado/estado  → último precio de cada símbolo + salud de la ingesta   (paso 1.2)
     GET  /mercado/velas   → velas OHLCV para dibujar el gráfico                   (paso 1.3)
+    GET  /mercado/resumen → precio + cambio % (1h/24h/7d) + máx/mín/volumen 24h   (paso 2.2)
     WS   /ws/mercado      → el backend EMPUJA los precios en vivo                 (paso 1.4)
 
 Desde el paso 1.2, al arrancar la API se encienden tareas de fondo que corren para siempre:
@@ -32,6 +33,7 @@ from app.estado import EstadoMercado
 from app.ingesta.almacen import EscritorDeTicks
 from app.ingesta.binance import SIMBOLOS_MVP, escuchar_ticks
 from app.modelos import Tick
+from app.resumen import PLAZOS, obtener_resumen, resumen_a_json
 from app.velas import LIMITE_MAXIMO, obtener_velas, vela_a_json
 
 logging.basicConfig(level=logging.INFO)
@@ -236,6 +238,80 @@ async def mercado_velas(
             "intervalo": intervalo,
             "cantidad": len(velas),
             "velas": [vela_a_json(vela) for vela in velas],
+        }
+    )
+
+
+@app.get("/mercado/resumen")
+async def mercado_resumen(
+    simbolos: list[str] | None = Query(
+        default=None,
+        description=(
+            "Pares a resumir, repetible (?simbolos=BTCUSDT&simbolos=ETHUSDT). "
+            f"Si se omite, se devuelven todos los vigilados: {', '.join(SIMBOLOS_MVP)}."
+        ),
+    ),
+) -> JSONResponse:
+    """Ficha de cada activo: a cuánto está y cómo viene. Es lo que llena la watchlist.
+
+    Para cada símbolo: el precio de ahora, la variación contra hace 1 h / 24 h / 7 d, y
+    el techo, el piso y el volumen del día.
+
+    **Tres campos que conviene mirar antes de creerle a los números:**
+
+    - `momento` — de cuándo es el precio. Si Argos estuvo apagado, es viejo, y el
+      resumen lo dice en vez de disimularlo.
+    - `cambios.<plazo>` en `null` — no había con qué comparar (falta historia de ese
+      tramo, o la que hay quedó demasiado lejos del plazo pedido). Es un "no sé", no un
+      cero: rellenarlo sería inventar. Si pasa en `7d` recién estrenado, corré el
+      backfill: `uv run python -m app.ingesta.backfill --dias 365`.
+    - `minutos_24h` — cuántos de los 1.440 minutos del día tienen datos. Con 1.440 el
+      volumen es el real; con 300, es el volumen de 300 minutos y nada más.
+
+    Un símbolo del que no hay ningún dato **no aparece** en la respuesta.
+    """
+    pedidos = list(SIMBOLOS_MVP) if not simbolos else simbolos
+
+    desconocidos = [simbolo for simbolo in pedidos if simbolo not in SIMBOLOS_MVP]
+    if desconocidos:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "simbolo_no_vigilado",
+                "detalle": f"Argos todavía no vigila: {', '.join(desconocidos)}.",
+                "disponibles": list(SIMBOLOS_MVP),
+            },
+        )
+
+    # El precio del instante sale de memoria; la historia con qué compararlo, de la base.
+    # Se los pasamos juntos para que el ancla de los plazos sea el dato más nuevo de las
+    # dos fuentes (ver el docstring de resumen.py: es el detalle que evita mostrar un
+    # cambio de tres días con la etiqueta "24h").
+    ticks_vivos = {
+        simbolo: tick
+        for simbolo in pedidos
+        if (tick := estado_mercado.ultimo(simbolo)) is not None
+    }
+
+    try:
+        resumenes = await obtener_resumen(pedidos, ticks_vivos)
+    except Exception as error:
+        logger.warning("No se pudo armar el resumen de mercado: %s", error)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "sin_conexion",
+                "detalle": str(error),
+                "pista": "¿Está levantada la base? Probá GET /health/db",
+            },
+        ) from error
+
+    return JSONResponse(
+        content={
+            "plazos": list(PLAZOS),
+            "simbolos": {
+                simbolo: resumen_a_json(resumen) for simbolo, resumen in resumenes.items()
+            },
         }
     )
 
