@@ -101,10 +101,42 @@ de al lado quedaría clavado 10 s. Verificado: el recalculado sale idéntico al 
 no está fijo en BTCUSDT · 1m y los botones de tramo salen de `INTERVALOS`. **Bug que apareció al
 verificar**: el rango de 24 h de ETH salía `1,9K – 1,9K` (dos números distintos, mismo texto) → cifras
 significativas. Sigue en mock solo `PriceVolChart` (la tarjeta lo dice) y la volatilidad σ → Fase 3.
+**2.2c HECHO (primera pasada real por el navegador + auditoría de diseño)**: tres bugs y una escala de
+color. Los dos gotchas de React están abajo porque se repiten. Además: seleccionar un activo **ya no
+salta al Panel** —desde Mercados se elige otra moneda para comparar KPIs y el salto expulsaba de la
+tabla—; elegir cambia de QUÉ se habla, no DÓNDE se mira. El pin se aplastaba porque estaba envuelto en
+un `span` sin `flex:none` para cortar el clic → ahora el corte lo hace el propio `Pin`. Y la auditoría
+con **`ui-ux-pro-max`** (instalada como plugin) encontró que `--faint` daba **2,69:1** contra el mínimo
+de 4,5:1 de WCAG y era el color de casi todas las etiquetas: la escala de tintas se rehizo en cuatro
+escalones con **`--ghost` reservado para lo que NO es información**. Detalle y tabla de contrastes en
+`ARQUITECTURA.md` → "La escala de tintas, medida". ⚠️ Ojo con esa skill: su `--design-system` devuelve
+patrones de *landing page* y no sirve para Argos — lo útil son sus dominios `ux`, `react` y `chart`.
 **Siguiente: 3.1 (framework de detectores: clase base + registro de plugins).**
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.
+
+## Gotchas que ya nos mordieron (leer antes de tocar el frontend)
+
+- **`dangerouslySetInnerHTML`: el objeto va FUERA del componente.** React compara esa prop por
+  **identidad del objeto**, no por el string que lleva adentro. Escrito como
+  `dangerouslySetInnerHTML={{ __html: … }}` dentro del render, es un objeto nuevo en cada pasada →
+  React reescribe el `innerHTML` del SVG entero → nodos nuevos → **las animaciones CSS arrancan de
+  cero**. Síntoma: "el logo se anima todo el rato". Estaba en `Peacock`, `Radar`, `IsoLayers` y
+  `CoinLogo` desde el paso 0.4 y no se veía porque esos árboles se renderizaban una vez; lo destapó
+  el 2.2b, al poner datos en vivo en el menú y en la tabla (render cada 0,5 s).
+- **lightweight-charts no acepta actualizar hacia atrás.** Al cambiar de intervalo, el efecto que
+  trae la historia sale a la red (asíncrono) y el que mueve la vela en curso corre enseguida, en el
+  mismo commit: mandaba el precio vivo ya ubicado en el tramo NUEVO a una serie que todavía tenía
+  dibujado el viejo. Excepción → sin error boundary React desmonta la app → **pantalla negra**. Se
+  resuelve con la marca `datosDe` en `CandleChart.tsx`: de qué símbolo e intervalo son las velas que
+  la serie muestra ahora mismo.
+- **La regla `data/` del `.gitignore` no estaba anclada** y se comía `frontend/src/data/`. Resultado:
+  el frontend **no compilaba desde un clon limpio** desde el paso 0.4, y nadie se enteró porque en la
+  máquina de trabajo el archivo estaba. Ya está anclada a `/data/`. Moraleja: al agregar una carpeta
+  con nombre genérico al `.gitignore`, anclarla a la raíz.
+- **`pkill -f "uvicorn"` se mata a sí mismo**: el patrón coincide con la propia línea de comando del
+  shell que lo ejecuta. Usar `pgrep -f "app.main:app"` y matar por PID.
 
 ## 8. Índice de documentos
 Salta a un doc solo si necesitas su detalle. Conforme avance el proyecto se agregan aquí los MD de avance.
