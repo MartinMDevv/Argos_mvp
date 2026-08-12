@@ -164,7 +164,7 @@ def test_sin_precio_no_opina():
 
 
 def test_la_linea_pertenece_al_lado_de_abajo_subiendo():
-    """"Avisame si sube de 70.000" no avisa AL llegar a 70.000, sino al pasarlo."""
+    """"Avísame si sube de 70.000" no avisa AL llegar a 70.000, sino al pasarlo."""
     detector = con_umbrales(umbral("70000", "arriba"))
 
     pasos = alimentar(detector, "69900", "70000", "70000.01")
@@ -174,7 +174,7 @@ def test_la_linea_pertenece_al_lado_de_abajo_subiendo():
 
 
 def test_la_linea_pertenece_al_lado_de_abajo_bajando():
-    """"Avisame si baja de 3.400" avisa al tocar 3.400 justo."""
+    """"Avísame si baja de 3.400" avisa al tocar 3.400 justo."""
     detector = con_umbrales(umbral("3400", "abajo", simbolo="ETHUSDT"))
 
     pasos = alimentar(detector, "3450", "3400", simbolo="ETHUSDT")
@@ -244,7 +244,7 @@ def test_la_nota_del_umbral_viaja_en_el_aviso():
 
 
 def test_la_severidad_es_aviso():
-    """No es `info` (lo pediste vos, no es color) ni `fuerte` (eso queda para lo que
+    """No es `info` (lo pediste tú, no es color) ni `fuerte` (eso queda para lo que
     Argos encuentre solo y sea anómalo de verdad)."""
     detector = con_umbrales(umbral("70000", "arriba"))
 

@@ -1,12 +1,12 @@
-"""Alerta #1: el precio cruzó una línea que vos pusiste (paso 3.2).
+"""Alerta #1: el precio cruzó una línea que pusiste tú (paso 3.2).
 
 La más simple de las cuatro del MVP y la de menos ruido, porque el criterio no lo pone
-Argos: lo pusiste vos. "Avisame si BTC pasa de 70.000".
+Argos: lo pusiste tú. "Avísame si BTC pasa de 70.000".
 
 ## Cruzar no es estar
 La versión ingenua de esto es `if precio > umbral: avisar`, y está mal. Mientras BTC se
 quede arriba de 70.000 —horas, días— esa condición sigue siendo verdadera, y Argos te
-avisaría una y otra vez de algo que ya te contó. Lo que vos querés saber es el
+avisaría una y otra vez de algo que ya te contó. Lo que tú quieres saber es el
 **momento en que cruza**: una transición, no un estado.
 
 Y una transición no se puede ver en un instante. Hace falta saber de qué lado estaba el
@@ -63,7 +63,7 @@ class UmbralDePrecio(Detector):
     nombre = "umbral_precio"
     titulo = "Umbral tocado"
     descripcion = (
-        "Avisa cuando el precio cruza un valor que fijaste vos. "
+        "Avisa cuando el precio cruza un valor que fijaste tú. "
         "Se configuran en GET/POST /umbrales."
     )
     cadencia = Cadencia.POR_TICK

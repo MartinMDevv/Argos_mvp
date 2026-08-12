@@ -3,7 +3,7 @@
 Regla: NUNCA escribir contraseñas en el código. Todo sale de variables de entorno.
 
 La única fuente de la verdad es `infra/.env`, el MISMO archivo que usa docker-compose
-para crear la base de datos. Así la contraseña vive en un solo lugar: si la cambiás ahí,
+para crear la base de datos. Así la contraseña vive en un solo lugar: si la cambias ahí,
 cambia para todos.
 
 Orden de prioridad (gana el primero que exista):

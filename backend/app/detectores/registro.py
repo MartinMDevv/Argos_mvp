@@ -19,7 +19,7 @@ Un decorador y un descubrimiento automático:
         nombre = "umbral_precio"
         ...
 
-Guardás el archivo en `app/detectores/` y listo. `descubrir()` importa todos los
+Guardas el archivo en `app/detectores/` y listo. `descubrir()` importa todos los
 módulos de la carpeta al arrancar, cada `@registrar` se ejecuta al importarse y el
 detector queda en el catálogo. No hay ninguna lista que mantener.
 
@@ -68,13 +68,13 @@ def registrar(clase: type[Detector]) -> type[Detector]:
     if ya_estaba is not None and ya_estaba is not clase:
         raise ValueError(
             f"Ya hay un detector llamado '{nombre}' ({ya_estaba.__module__}). "
-            f"Elegí otro nombre para {clase.__module__}.{clase.__name__}."
+            f"Elige otro nombre para {clase.__module__}.{clase.__name__}."
         )
 
     if not isinstance(clase.cadencia, Cadencia):
         raise ValueError(
             f"El detector '{nombre}' tiene una cadencia inválida ({clase.cadencia!r}). "
-            f"Usá Cadencia.POR_TICK o Cadencia.POR_VELA_CERRADA."
+            f"Usa Cadencia.POR_TICK o Cadencia.POR_VELA_CERRADA."
         )
 
     if clase.cadencia is Cadencia.POR_VELA_CERRADA and clase.intervalo not in INTERVALOS:
@@ -89,7 +89,7 @@ def registrar(clase: type[Detector]) -> type[Detector]:
     if clase.cadencia is Cadencia.POR_TICK and clase.velas_necesarias > 0:
         raise ValueError(
             f"El detector '{nombre}' es POR_TICK pero pide {clase.velas_necesarias} velas. "
-            "La ruta del tick no carga historia: usá Cadencia.POR_VELA_CERRADA."
+            "La ruta del tick no carga historia: usa Cadencia.POR_VELA_CERRADA."
         )
 
     if clase.silencio.total_seconds() < 0:

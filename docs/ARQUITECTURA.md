@@ -50,13 +50,13 @@ backend/
 │   │   ├── motor.py     → quién pregunta, cuándo, y qué hace con la respuesta
 │   │   ├── almacen.py   → guarda y lee alertas en la tabla `alertas`
 │   │   ├── umbrales.py  → la configuración de la alerta #1: copia en memoria + tabla (3.2)
-│   │   └── umbral_precio.py → alerta #1: el precio cruzó una línea que pusiste vos (3.2)
+│   │   └── umbral_precio.py → alerta #1: el precio cruzó una línea que pusiste tú (3.2)
 │   └── main.py          → la app FastAPI; endpoints + arranque de las tareas de fondo
 ├── sql/
 │   ├── 001_ticks.sql            → tabla `ticks` como hypertable + índices
 │   ├── 002_velas_historicas.sql → velas de 1m traídas de Binance (la historia que nos perdimos)
 │   ├── 003_alertas.sql          → tabla `alertas` (tabla normal, NO hypertable: son pocas por diseño)
-│   └── 004_umbrales.sql         → tabla `umbrales`: los precios que vos elegiste vigilar (3.2)
+│   └── 004_umbrales.sql         → tabla `umbrales`: los precios que elegiste vigilar (3.2)
 ├── pruebas/             → pytest. Ninguna necesita Docker ni internet (paso 3.1)
 │   ├── conftest.py      → fábricas de datos + detectores de mentira + aislamiento del registro
 │   ├── test_registro.py → que un detector mal definido reviente AL ARRANCAR
@@ -294,7 +294,7 @@ concretos. Acá es un decorador (`@registrar`) más un descubrimiento automátic
 ### Alerta #1 — umbral de precio: cruzar no es estar (paso 3.2)
 
 El primer detector de verdad, y el más simple de los cuatro, porque el criterio no lo pone Argos: lo
-ponés vos. La parte que no es obvia:
+pones tú. La parte que no es obvia:
 
 - **La versión ingenua está mal.** `if precio > umbral: avisar` sigue siendo verdadera mientras BTC se
   quede arriba de 70.000 —horas, días—, así que Argos te contaría lo mismo una y otra vez. Lo que se
@@ -309,7 +309,7 @@ ponés vos. La parte que no es obvia:
   reinicio puede perderse un cruce; el beneficio es que Argos nunca fecha hoy algo que pasó mientras
   estaba apagado. Verificado en vivo.
 - **La línea pertenece al lado de abajo.** Un precio exactamente igual al umbral cuenta como "abajo",
-  así que "avisame si sube de 70.000" avisa a los 70.000,01 y "avisame si baja de 3.400" avisa al tocar
+  así que "avísame si sube de 70.000" avisa a los 70.000,01 y "avísame si baja de 3.400" avisa al tocar
   3.400 justo. La regla tenía que ser una de las dos; esta hace que ninguna de las dos frases mienta.
 - **Contra el precio que baila sobre la línea actúa el silencio del motor**, no una histéresis. Medido
   en vivo: 11 cruces reales, todos correctos, todos la misma noticia, todos callados. Si algún día 15
@@ -324,12 +324,14 @@ Docker ni internet **es** la comprobación del diseño: si mañana una prueba de
 pedir la base, la pregunta no es cómo levantarla, es qué se rompió. Dos decisiones que conviene no
 deshacer:
 
-- **Las pruebas definen sus propios detectores** en vez de usar los de `humo.py`. Los de humo son
-  andamios que se borran en el 3.2, y una prueba que dependiera de ellos se rompería ese día por un
-  motivo que no tiene nada que ver con lo que prueba.
+- **Las pruebas de la maquinaria definen sus propios detectores** (en `conftest.py`) en vez de usar
+  los de verdad. La razón se comprobó enseguida: los andamios `humo.py` del 3.1 se borraron en el
+  3.2, y una prueba que hubiera dependido de ellos se habría roto ese día por un motivo que no tiene
+  nada que ver con lo que probaba. Un detector real se prueba en su propio archivo.
 - **`test_todos_los_detectores_de_verdad_cumplen_las_reglas`** recorre lo que haya en la carpeta y
-  verifica los invariantes sin nombrar a nadie. Es la red que cubre gratis a cada detector que se
-  escriba de acá en adelante — incluidos los cuatro del MVP, que todavía no existen.
+  verifica los invariantes sin nombrar a nadie. Ya se ganó el sueldo: se escribió cuando los únicos
+  detectores eran los andamios, y cuando estos se borraron siguió andando tal cual, cubriendo al
+  detector nuevo sin que nadie la tocara. Cubre gratis a los tres del MVP que faltan.
 
 ## 🖥️ frontend/ — React 19 + Vite + Tailwind v4 (TypeScript)
 

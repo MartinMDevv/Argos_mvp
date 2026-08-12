@@ -1,4 +1,4 @@
--- 004_umbrales.sql — Los precios que vos elegiste vigilar (paso 3.2)
+-- 004_umbrales.sql — Los precios que elegiste vigilar (paso 3.2)
 --
 -- Idempotente como los anteriores: todo es "IF NOT EXISTS", se aplica en cada arranque.
 
@@ -6,7 +6,7 @@
 -- Por qué una tabla y no un archivo de configuración
 -- ---------------------------------------------------------------------------
 -- Todo lo demás que Argos guarda viene del mercado. Esto no: viene de una decisión
--- tuya ("avisame si BTC pasa de 70.000"), y es la única parte del sistema que se
+-- tuya ("avísame si BTC pasa de 70.000"), y es la única parte del sistema que se
 -- crea y se borra mientras está corriendo. Un `.env` o un YAML habría que releerlo,
 -- no tiene identificadores para poder borrar uno solo, y el panel del paso 3.6 no
 -- podría editarlo. Una tabla resuelve las tres cosas.
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS umbrales (
     -- en el único momento que importa.
     valor     NUMERIC(20, 8) NOT NULL CHECK (valor > 0),
     -- 'arriba' = avisar al cruzar subiendo; 'abajo', bajando. Un umbral vigila UNA
-    -- dirección: si querés las dos, son dos filas, y así cada aviso dice qué pasó
+    -- dirección: si quieres las dos, son dos filas, y así cada aviso dice qué pasó
     -- sin que haya que deducirlo. El CHECK está para que un error de tipeo no entre
     -- a la base y deje un umbral que no se dispara nunca.
     direccion TEXT           NOT NULL CHECK (direccion IN ('arriba', 'abajo')),

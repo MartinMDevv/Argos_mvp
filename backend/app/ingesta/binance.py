@@ -220,7 +220,7 @@ class _ImpresorDeTicks:
 
 
 async def _correr_prueba(simbolos: Sequence[str], limite: int | None) -> None:
-    """Levanta la escucha y la corta cuando se llega al límite o cuando cortás con Ctrl+C."""
+    """Levanta la escucha y la corta cuando se llega al límite o cuando cortas con Ctrl+C."""
     impresor = _ImpresorDeTicks(limite)
     tarea = asyncio.create_task(escuchar_ticks(impresor, simbolos))
 

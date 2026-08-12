@@ -171,8 +171,8 @@ async def _tramos_faltantes(
 ) -> list[tuple[datetime, datetime]]:
     """Qué pedazos del rango pedido todavía no tenemos.
 
-    La descarga es **incremental**: si ya bajaste un año y mañana volvés a correrla, solo pide
-    lo nuevo. Y si un día querés más historia hacia atrás, pide solo lo que falta por delante
+    La descarga es **incremental**: si ya bajaste un año y mañana vuelves a correrla, solo pide
+    lo nuevo. Y si un día quieres más historia hacia atrás, pide solo lo que falta por delante
     del comienzo actual. Como Binance devuelve rangos continuos, alcanza con mirar los bordes:
     lo que hay en el medio está completo.
     """

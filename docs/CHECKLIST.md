@@ -112,10 +112,11 @@ TimescaleDB → velas → empujado al panel.
   producción): **57 pruebas en 0,06 s, sin Docker ni internet** — comprobado apuntando la config a
   un host inexistente. Cubren el registro (que un detector mal definido reviente **al arrancar**),
   el contexto y sus huecos, la clave y la evidencia de las alertas, y el silencio con sus bordes
-  (ventana exacta, ventana en cero, precarga tras reinicio). **Las pruebas definen sus propios
-  detectores** en vez de usar los de `humo.py`, para que no se rompan cuando lo borremos. Y
+  (ventana exacta, ventana en cero, precarga tras reinicio). **Las pruebas de la maquinaria definen
+  sus propios detectores** en vez de usar los reales — y se comprobó enseguida que valía la pena:
+  los andamios `humo.py` se borraron en el 3.2 y ninguna prueba se rompió. Y
   `test_todos_los_detectores_de_verdad_cumplen_las_reglas` recorre la carpeta sin nombrar a nadie:
-  cubre gratis a los cuatro detectores del MVP que todavía no existen.)*
+  cubre gratis a cada detector que se escriba después.)*
 - [x] **3.2** Alerta #1 Umbral de precio ✅
   *(`app/detectores/umbral_precio.py` + `umbrales.py` (configuración: memoria + tabla) +
   `sql/004_umbrales.sql` + `GET/POST/DELETE /umbrales`. **`humo.py` borrado**: los andamios
@@ -178,9 +179,9 @@ de cada una está en el [spec, §2.F](../../spec-crypto-monitor.md).
 ---
 
 **👉 Estamos aquí:** **Fases 0, 1 y 2 cerradas + 3.1 y 3.2 hechos.** Argos ya vigila algo de verdad:
-le decís "avisame si BTC pasa de 70.000" y te avisa cuando lo cruza, una sola vez, con los números que
+le dices "avísame si BTC pasa de 70.000" y te avisa cuando lo cruza, una sola vez, con los números que
 lo justifican. Falta que lo encuentre solo — las tres alertas que vienen (movimiento %, volatilidad,
-volumen) son las que no dependen de que vos sepas qué número mirar. Siguiente: **3.3 — Movimiento % en
+volumen) son las que no dependen de que tú sepas qué número mirar. Siguiente: **3.3 — Movimiento % en
 ventana**, el primero que usa la historia (`POR_VELA_CERRADA`) en vez del tick suelto.
 
 ### Cómo levantar el frontend

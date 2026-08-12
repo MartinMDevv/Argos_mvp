@@ -141,13 +141,13 @@ DIRECCIONES = ("arriba", "abajo")
 
 @dataclass(frozen=True, slots=True)
 class Umbral:
-    """Un precio que vos elegiste vigilar. La configuración de la alerta #1 (paso 3.2).
+    """Un precio que elegiste vigilar. La configuración de la alerta #1 (paso 3.2).
 
-    "Avisame si BTC pasa de 70.000". Es lo único de Argos que no sale del mercado sino
+    "Avísame si BTC pasa de 70.000". Es lo único de Argos que no sale del mercado sino
     de una decisión tuya, y por eso vive en su propia tabla y no en un archivo de
     configuración: se crea y se borra mientras el sistema corre.
 
-    Un umbral vigila **una sola dirección**. Si querés enterarte tanto de la subida
+    Un umbral vigila **una sola dirección**. Si quieres enterarte tanto de la subida
     como de la bajada, son dos umbrales — así cada aviso dice exactamente qué pasó, sin
     que haya que deducirlo.
     """
@@ -162,8 +162,8 @@ class Umbral:
     """`arriba` = avisar cuando el precio cruza la línea subiendo; `abajo`, bajando.
 
     **La línea pertenece al lado de abajo**: un precio exactamente igual a `valor`
-    cuenta como "abajo". Así, "avisame si sube de 70.000" avisa recién a los 70.000,01,
-    y "avisame si baja de 3.400" avisa al tocar 3.400 justo. La regla tenía que ser una
+    cuenta como "abajo". Así, "avísame si sube de 70.000" avisa recién a los 70.000,01,
+    y "avísame si baja de 3.400" avisa al tocar 3.400 justo. La regla tenía que ser una
     de las dos; esta es la que hace que ninguna de las dos frases mienta."""
 
     nota: str | None = None
@@ -187,7 +187,7 @@ class Alerta:
     son los números crudos con los que el detector llegó a esa conclusión — el valor
     medido, la media contra la que lo comparó, la desviación, el umbral cruzado.
 
-    Con eso, quien la reciba —vos, el panel, la IA de la Fase 5— puede rehacer la
+    Con eso, quien la reciba —tú, el panel, la IA de la Fase 5— puede rehacer la
     cuenta. Y cuando llegue la v1.2 y haya que medir si las alertas acertaron, la
     evidencia es lo que permite volver sobre una alerta vieja y entender qué vio.
 

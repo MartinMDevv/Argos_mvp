@@ -1,13 +1,13 @@
 """El antirruido: cuándo Argos se calla aunque tenga algo que decir (paso 3.1).
 
 ## Por qué esto existe
-Imaginate el detector de volumen anómalo. A las 14:03 el volumen de BTC está a 3,4σ de
+Imagina el detector de volumen anómalo. A las 14:03 el volumen de BTC está a 3,4σ de
 su media y salta la alerta. A las 14:04 sigue a 3,2σ. A las 14:05, a 3,1σ. Todas son
 detecciones correctas — y las tres son **la misma noticia**. Sin nada que lo frene,
 Argos te manda sesenta mensajes por hora contando lo mismo.
 
-Eso tiene nombre: fatiga de alertas. Y el final es conocido: silenciás las
-notificaciones y el día que salte la que importaba no te enterás. Un vigilante que grita
+Eso tiene nombre: fatiga de alertas. Y el final es conocido: silencias las
+notificaciones y el día que salte la que importaba no te enteras. Un vigilante que grita
 todo el tiempo es igual de inútil que uno dormido, con el agravante de que parece que
 funciona.
 

@@ -1,7 +1,7 @@
 """El registro tiene que rechazar un detector mal definido AL ARRANCAR.
 
 ## Por qué esto importa más de lo que parece
-Un detector roto no se nota. Si una alerta salta de más, molesta y la arreglás; si un
+Un detector roto no se nota. Si una alerta salta de más, molesta y la arreglas; si un
 detector deja de emitir en silencio, todo se ve perfectamente normal — hasta el día que
 esperabas el aviso y no llegó. Ese es el modo de falla peligroso de Argos, y contra eso
 la defensa es que el error aparezca lo más temprano y lo más ruidoso posible: al

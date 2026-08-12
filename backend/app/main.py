@@ -211,7 +211,7 @@ async def health_db() -> JSONResponse:
             content={
                 "status": "sin_conexion",
                 "detalle": str(error),
-                "pista": "Encendé Docker (docker-on) y levantá infra: docker compose up -d --wait",
+                "pista": "Enciende Docker (docker-on) y levanta infra: docker compose up -d --wait",
             },
         )
 
@@ -291,7 +291,7 @@ async def mercado_velas(
             detail={
                 "status": "sin_conexion",
                 "detalle": str(error),
-                "pista": "¿Está levantada la base? Probá GET /health/db",
+                "pista": "¿Está levantada la base? Prueba GET /health/db",
             },
         ) from error
 
@@ -326,7 +326,7 @@ async def mercado_resumen(
       resumen lo dice en vez de disimularlo.
     - `cambios.<plazo>` en `null` — no había con qué comparar (falta historia de ese
       tramo, o la que hay quedó demasiado lejos del plazo pedido). Es un "no sé", no un
-      cero: rellenarlo sería inventar. Si pasa en `7d` recién estrenado, corré el
+      cero: rellenarlo sería inventar. Si pasa en `7d` recién estrenado, corre el
       backfill: `uv run python -m app.ingesta.backfill --dias 365`.
     - `minutos_24h` — cuántos de los 1.440 minutos del día tienen datos. Con 1.440 el
       volumen es el real; con 300, es el volumen de 300 minutos y nada más.
@@ -365,7 +365,7 @@ async def mercado_resumen(
             detail={
                 "status": "sin_conexion",
                 "detalle": str(error),
-                "pista": "¿Está levantada la base? Probá GET /health/db",
+                "pista": "¿Está levantada la base? Prueba GET /health/db",
             },
         ) from error
 
@@ -418,7 +418,7 @@ async def listar_alertas(
     del proyecto es que Argos no afirma nada que no se pueda verificar.
 
     Ojo con `severidad`: mide qué tan notable es el hallazgo para el detector que lo
-    emitió, no si conviene comprar o vender. Argos informa; decidís vos.
+    emitió, no si conviene comprar o vender. Argos informa; decides tú.
     """
     if simbolo is not None and simbolo not in SIMBOLOS_MVP:
         raise HTTPException(
@@ -449,7 +449,7 @@ async def listar_alertas(
             detail={
                 "status": "sin_conexion",
                 "detalle": str(error),
-                "pista": "¿Está levantada la base? Probá GET /health/db",
+                "pista": "¿Está levantada la base? Prueba GET /health/db",
             },
         ) from error
 
@@ -481,7 +481,7 @@ def listar_umbrales() -> dict[str, object]:
     Se responde **desde memoria**, que es la misma copia que mira el detector con cada
     operación: si algo aparece acá, está siendo vigilado de verdad.
 
-    Mirá `cargado_alguna_vez`: si es `false`, Argos todavía no pudo leer la tabla (la
+    Mira `cargado_alguna_vez`: si es `false`, Argos todavía no pudo leer la tabla (la
     base estaba caída al arrancar) y la lista vacía **no significa que no haya
     umbrales**, significa que no sabemos. Se reintenta cada minuto.
     """
@@ -498,7 +498,7 @@ async def crear_umbral(nuevo: UmbralNuevo = Body()) -> dict[str, object]:
     """Agrega un umbral. Empieza a vigilarse en la operación siguiente (paso 3.2).
 
     **Ojo con lo que NO hace:** si el precio ya está del otro lado de la línea cuando lo
-    creás, no vas a recibir un aviso inmediato. El detector avisa cuando ve **cruzar**, y
+    creas, no vas a recibir un aviso inmediato. El detector avisa cuando ve **cruzar**, y
     encontrar el precio ya cruzado no es haberlo visto cruzar. Vas a recibir el aviso la
     próxima vez que la cruce de verdad.
     """
@@ -540,7 +540,7 @@ async def crear_umbral(nuevo: UmbralNuevo = Body()) -> dict[str, object]:
             detail={
                 "status": "sin_conexion",
                 "detalle": str(error),
-                "pista": "¿Está levantada la base? Probá GET /health/db",
+                "pista": "¿Está levantada la base? Prueba GET /health/db",
             },
         ) from error
 
@@ -559,7 +559,7 @@ async def borrar_umbral(id_umbral: int = Path(ge=1)) -> None:
             detail={
                 "status": "sin_conexion",
                 "detalle": str(error),
-                "pista": "¿Está levantada la base? Probá GET /health/db",
+                "pista": "¿Está levantada la base? Prueba GET /health/db",
             },
         ) from error
 

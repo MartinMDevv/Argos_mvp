@@ -106,7 +106,7 @@ async def revisar_conexion() -> dict[str, str | None]:
     pool = await asegurar_pool()
 
     async with pool.acquire() as conexion:
-        # El clásico "¿me escuchás?": si esto vuelve con un 1, la conexión sirve.
+        # El clásico "¿me escuchas?": si esto vuelve con un 1, la conexión sirve.
         await conexion.fetchval("SELECT 1")
 
         version_postgres = await conexion.fetchval("SHOW server_version")

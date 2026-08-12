@@ -129,14 +129,15 @@ el silencio, y con `--reload` pasaría en cada cambio de código. Toda alerta vi
 números crudos, como texto): la regla de oro hecha estructura. Emitir y guardar están separados por una
 cola con reintento. **Verificado**: 35 comprobaciones sin BD ni red; en vivo 230 ticks → 4 alertas +
 226 silenciadas; con TimescaleDB caída 25 s, 2 alertas en cola, `/alertas` 503 con mensaje, y al volver
-entraron solas (14 emitidas = 14 guardadas, 0 descartadas). ⚠️ `detectores/humo.py` son dos andamios de
-verificación y **se borran en el 3.2**.
+entraron solas (14 emitidas = 14 guardadas, 0 descartadas). Los dos andamios de verificación
+(`detectores/humo.py`) ya cumplieron y se borraron en el 3.2.
 **3.1b HECHO (primeras pruebas del proyecto, no estaba en el plan)**: `backend/pruebas/` con pytest en
-el grupo `dev` del pyproject (no toca las dependencias de producción). **57 pruebas en 0,06 s, sin
-Docker ni internet** — verificado apuntando `POSTGRES_HOST` a un host inexistente. Que no necesiten la
-base ES la comprobación del diseño: si una prueba de detectores empieza a pedirla, mirar qué se rompió
-antes de levantarla. Dos decisiones a no deshacer: (a) **las pruebas definen sus propios detectores**
-(en `conftest.py`) y no usan los de `humo.py`, que se borra en el 3.2; (b)
+el grupo `dev` del pyproject (no toca las dependencias de producción). **80 pruebas al cerrar el 3.2,
+en 0,07 s, sin Docker ni internet** — verificado apuntando `POSTGRES_HOST` a un host inexistente. Que
+no necesiten la base ES la comprobación del diseño: si una prueba de detectores empieza a pedirla,
+mirar qué se rompió antes de levantarla. Dos decisiones a no deshacer: (a) **las pruebas de la
+maquinaria definen sus propios detectores** (en `conftest.py`) y no usan los reales — se comprobó al
+borrar `humo.py` en el 3.2, cuando ninguna se rompió; (b)
 `test_todos_los_detectores_de_verdad_cumplen_las_reglas` recorre la carpeta **sin nombrar a nadie** y
 verifica los invariantes, así que cubre gratis a cada detector futuro. Correr: `cd backend && uv run pytest`.
 **3.2 HECHO (alerta #1, umbral de precio — el primer detector real)**: `detectores/umbral_precio.py`

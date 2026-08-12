@@ -9,7 +9,7 @@ nada — y **nada es la respuesta más frecuente y más deseable**.
 `evaluar()` no es `async` y no toca la base de datos. Recibe todo lo que necesita ya
 cargado en el `ContextoDeEvaluacion` y devuelve una alerta o `None`. No es un descuido:
 
-- **Se puede probar.** Le armás un contexto a mano y sabés qué tiene que salir. Un
+- **Se puede probar.** Le armas un contexto a mano y sabes qué tiene que salir. Un
   detector que se conecta a la base solo se prueba con la base encendida.
 - **Se puede repetir sobre el pasado.** La v2.0 del norte pide *backtesting de las
   propias alertas*: correr los detectores sobre la historia para medir cuáles sirven.
@@ -78,7 +78,7 @@ class ContextoDeEvaluacion:
     velas: tuple[Vela, ...] = ()
     """Historia reciente en orden cronológico (la más vieja primero).
 
-    **La última puede estar a medio formar** (`completa=False`). Casi siempre querés
+    **La última puede estar a medio formar** (`completa=False`). Casi siempre quieres
     `velas_cerradas`: sacar conclusiones de una vela que todavía se está armando es
     opinar sobre un minuto que no terminó."""
 
@@ -106,7 +106,7 @@ class ContextoDeEvaluacion:
         """El precio más confiable que hay a mano, o `None` si no hay ninguno.
 
         Prefiere el tick vivo (segundos de antigüedad) y si no hay cae al último cierre
-        guardado. Mirá `origen_precio` para saber cuál de los dos tocó: no es lo mismo
+        guardado. Mira `origen_precio` para saber cuál de los dos tocó: no es lo mismo
         decidir con un precio de hace dos segundos que con uno de hace dos días.
         """
         if self.tick is not None:
@@ -125,8 +125,8 @@ class ContextoDeEvaluacion:
 class Detector(ABC):
     """La clase de la que hereda cada alerta enchufable.
 
-    Para escribir uno nuevo: heredá de acá, completá los atributos de clase, poné el
-    decorador `@registrar` encima y guardá el archivo en esta carpeta. Eso es todo —
+    Para escribir uno nuevo: hereda de aquí, completa los atributos de clase, pon el
+    decorador `@registrar` encima y guarda el archivo en esta carpeta. Eso es todo —
     el motor lo encuentra solo. No hay ningún lugar donde haya que "darlo de alta".
     """
 
@@ -177,7 +177,7 @@ class Detector(ABC):
         una alerta perdida en silencio, que es el peor modo de falla de Argos.
 
         No hagas E/S acá dentro (ni base de datos, ni red): ver el encabezado del
-        módulo. Y usá `contexto.momento`, nunca `datetime.now()`.
+        módulo. Y usa `contexto.momento`, nunca `datetime.now()`.
         """
 
     def puede_opinar(self, contexto: ContextoDeEvaluacion) -> bool:

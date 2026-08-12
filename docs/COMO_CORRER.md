@@ -25,7 +25,7 @@ Puertos que usa: **5432** (base de datos) · **8000** (API backend) · **5173** 
 ```bash
 docker-on                       # encender Docker (alias personal)
 cd infra
-cp .env.example .env            # solo la 1ª vez; poné una contraseña real
+cp .env.example .env            # solo la 1ª vez; pon una contraseña real
 docker compose up -d --wait     # levanta TimescaleDB
 docker compose ps               # debe verse "healthy"
 ```
@@ -50,8 +50,8 @@ Verificar:
   (intervalos: `1m`, `5m`, `15m`, `1h`, `4h`, `1d`)
 - http://localhost:8000/mercado/resumen → precio + cambio % (1h/24h/7d) + máx/mín/volumen del día
   de cada símbolo. Filtrable: `?simbolos=BTCUSDT&simbolos=ETHUSDT`.
-  **Si un plazo sale `null` es que falta historia de ese tramo** — no es un error: corré el backfill
-  (`uv run python -m app.ingesta.backfill --dias 365`). Mirá también `minutos_24h`: cuántos de los
+  **Si un plazo sale `null` es que falta historia de ese tramo** — no es un error: corre el backfill
+  (`uv run python -m app.ingesta.backfill --dias 365`). Mira también `minutos_24h`: cuántos de los
   1.440 minutos del día tienen datos. Con menos de 1.440, el volumen es el de esos minutos y nada más.
 - `ws://localhost:8000/ws/mercado` → canal en vivo. Para probarlo sin frontend:
   ```bash
@@ -67,7 +67,7 @@ Verificar:
   ```
 - http://localhost:8000/detectores → qué vigila Argos y con qué cadencia, más el pulso del motor.
   Si escribiste un detector en `app/detectores/` y **no aparece acá**, no se registró: lo más
-  probable es que le falte el decorador `@registrar`. Mirá también `silenciadas`: son alertas
+  probable es que le falte el decorador `@registrar`. Mira también `silenciadas`: son alertas
   correctas que repetían algo ya dicho, así que un número alto es el antirruido funcionando.
 - http://localhost:8000/alertas → lo que Argos vio, de lo más nuevo a lo más viejo.
   Filtrable: `?simbolo=BTCUSDT`, `?detector=umbral_precio`, `?limite=100`.
@@ -87,22 +87,22 @@ Verificar:
 - http://localhost:8000/docs → documentación interactiva (Swagger)
 
 > **Desde el paso 1.2 la API se conecta sola a Binance al arrancar** y empieza a guardar ticks.
-> Si querés trabajar sin abrir esa conexión (por ejemplo con `--reload`, que reinicia en cada cambio):
+> Si quieres trabajar sin abrir esa conexión (por ejemplo con `--reload`, que reinicia en cada cambio):
 > ```bash
 > INGESTA_ACTIVA=false uv run uvicorn app.main:app --reload --port 8000
 > ```
 >
-> Desde el 3.1 hay un interruptor equivalente para la detección, si querés que la ingesta y el panel
+> Desde el 3.1 hay un interruptor equivalente para la detección, si quieres que la ingesta y el panel
 > sigan andando pero nadie evalúe ni escriba alertas:
 > ```bash
 > DETECCION_ACTIVA=false uv run uvicorn app.main:app --reload --port 8000
 > ```
 
-### Correr las pruebas (paso 3.1)
+### Correr las pruebas
 
 ```bash
 cd backend
-uv run pytest              # todo (57 pruebas, ~0,06 s)
+uv run pytest              # todo (80 pruebas, ~0,07 s)
 uv run pytest -v           # con el nombre de cada una
 uv run pytest pruebas/test_silencio.py    # un solo archivo
 ```
@@ -143,7 +143,7 @@ docker exec argos_timescaledb psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
 ```
 
 > Si `/health/db` devuelve **503** con `"status":"sin_conexion"`, no es un bug: es el aviso de que
-> la base de datos no está arriba. Volvé al paso 1 (`docker-on` + `docker compose up -d --wait`).
+> la base de datos no está arriba. Vuelve al paso 1 (`docker-on` + `docker compose up -d --wait`).
 > La API sigue respondiendo `/health` igual — se cae la BD, no Argos entero.
 
 ### Ver el mercado en vivo por consola (paso 1.1)
@@ -158,7 +158,7 @@ uv run python -m app.ingesta.binance                 # sin límite; cortar con C
 ```
 
 Deberías ver una línea por operación con hora, par, precio, cantidad, cuánto dinero movió y si mandó
-la compra (▲) o la venta (▼). Si no sale nada, revisá la conexión a internet.
+la compra (▲) o la venta (▼). Si no sale nada, revisa la conexión a internet.
 
 ## 3. Frontend (React + Vite)
 
@@ -171,7 +171,7 @@ npm run dev     # arranca el servidor de desarrollo
 Abrir **http://localhost:5173** → deberías ver el panel de Argos (nav, gráfico, favoritos, chat).
 
 **Con el backend arriba**, el gráfico del Panel muestra velas reales de BTCUSDT y se mueve solo. Para
-comprobar que está vivo de verdad y no es una imagen: dejalo un minuto y mirá cómo la última vela cambia
+comprobar que está vivo de verdad y no es una imagen: déjalo un minuto y mira cómo la última vela cambia
 de alto y de color, y cómo al cambiar de minuto nace una nueva.
 
 Si el backend está apagado, el gráfico lo dice (`Sin conexión` / `Argos todavía no vio operaciones`)
@@ -189,34 +189,34 @@ npx tsc -b        # solo el chequeo de tipos, sin compilar
 > VITE_API_URL=http://192.168.1.50:8000
 > ```
 > La dirección del WebSocket sale sola de ahí (`http://` → `ws://`). Ojo: el backend solo autoriza por
-> CORS los orígenes de desarrollo, así que si movés el frontend hay que agregarlo en `app/main.py`.
+> CORS los orígenes de desarrollo, así que si mueves el frontend hay que agregarlo en `app/main.py`.
 
 ---
 
 ## Cositas a tener en cuenta (gotchas)
 
-- **Docker no autoarranca**: si algo de la BD falla, revisá que Docker esté encendido (`docker-on`).
+- **Docker no autoarranca**: si algo de la BD falla, revisa que Docker esté encendido (`docker-on`).
 - **Python 3.13**: el backend está fijado a 3.13 con `uv` (el 3.14 del sistema no tiene todos los
   wheels). `uv` lo maneja solo; no uses el Python global.
-- **Si movés o renombrás la carpeta del proyecto, el `.venv` se rompe.** Los entornos virtuales
+- **Si mueves o renombras la carpeta del proyecto, el `.venv` se rompe.** Los entornos virtuales
   guardan **rutas absolutas** dentro de sus scripts, así que `uvicorn` falla con
   `Failed to spawn: uvicorn — No such file or directory` aunque el paquete esté instalado.
   Solución: regenerarlo (es desechable, está en `.gitignore`):
   ```bash
   cd backend && rm -rf .venv && uv sync
   ```
-- **`.env` de infra**: no se sube a git. Si clonás el repo en otra máquina, copiá `.env.example` a
-  `.env` y poné la contraseña.
+- **`.env` de infra**: no se sube a git. Si clonas el repo en otra máquina, copia `.env.example` a
+  `.env` y pon la contraseña.
 - **Todavía queda mock en el frontend**: el **gráfico** ya usa datos reales (2.1), pero la watchlist, la
   tabla de mercados y el sidebar siguen con los números de ejemplo de `src/data/coins.ts`. Se enchufan
   en el paso 2.2.
 - **El gráfico arranca casi vacío si Argos se encendió recién**: solo puede dibujar lo que vio. Dale unos
-  minutos, o mirá un intervalo corto (`1m`).
+  minutos, o mira un intervalo corto (`1m`).
 - **`en_espera` que no baja** en `/mercado/estado` significa que la ingesta anda pero la base no está
-  recibiendo. Revisá `/health/db`. Los ticks no se pierden mientras tanto (hay 20.000 de colchón).
+  recibiendo. Revisa `/health/db`. Los ticks no se pierden mientras tanto (hay 20.000 de colchón).
 - **Pocas velas al principio, y con huecos**: Argos solo arma velas de lo que escuchó, y cada apagón deja
   un hueco. **La solución es el backfill** (más arriba): corrélo una vez y el gráfico queda continuo. Los
-  huecos que queden después de correrlo son minutos posteriores a la última descarga → volvé a correrlo.
+  huecos que queden después de correrlo son minutos posteriores a la última descarga → vuelve a correrlo.
 - **La vela dice de dónde salió** (campo `fuente`): `propia` si la armamos con nuestros ticks, `historia`
   si vino del backfill, `mixta` si el tramo abarca las dos. Ojo con `operaciones`: en las propias son
   operaciones **agrupadas** y en las históricas son las **reales** (siempre más). No los compares entre sí.
