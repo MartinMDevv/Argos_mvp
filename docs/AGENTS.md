@@ -89,8 +89,19 @@ aproximado. Los ticks se escanean **solo desde donde termina el backfill** (mism
 índice. `minutos_24h` viaja con el volumen para que no se lea como el volumen del día cuando falta
 cobertura. Verificado contra `/api/v3/ticker/24hr`: máx/mín idénticos al octavo decimal, volumen a
 0,006%, cambio % a 0,01 pp. ⚠️ Los plazos están escritos a mano en dos lados (`PLAZOS` y `SQL_RESUMEN`).
-**Siguiente: 2.2b (watchlist + cabecera con datos reales, jubilar `src/data/coins.ts`, selector de
-moneda/intervalo).**
+**2.2b HECHO → FASE 2 COMPLETA**: todo el panel usa datos reales. `src/data/coins.ts` **eliminado**.
+Nuevos: `lib/activos.ts` (catálogo par ↔ símbolo corto: **un activo se identifica SIEMPRE por su par**
+`BTCUSDT`; `BTC` es solo para mostrar), `lib/formato.ts` (números es-CL vía `Intl`, signo `−` U+2212, y
+`SIN_DATO` = `—` cuando no hay dato — **nunca un cero**, que afirmaría "no se movió"), `lib/resumen.tsx`
+(UN pedido cada 10 s para toda la app, misma lógica que el proveedor del WebSocket) y `Sparkline.tsx`
+(curvas con velas reales; las de antes eran polilíneas escritas a mano — un gráfico inventado es peor
+que un número inventado, porque no se verifica, se cree). **El % se recalcula en el navegador** contra
+el precio vivo usando la `referencia` que manda el backend: si no, el precio se movería y el porcentaje
+de al lado quedaría clavado 10 s. Verificado: el recalculado sale idéntico al del backend. El gráfico ya
+no está fijo en BTCUSDT · 1m y los botones de tramo salen de `INTERVALOS`. **Bug que apareció al
+verificar**: el rango de 24 h de ETH salía `1,9K – 1,9K` (dos números distintos, mismo texto) → cifras
+significativas. Sigue en mock solo `PriceVolChart` (la tarjeta lo dice) y la volatilidad σ → Fase 3.
+**Siguiente: 3.1 (framework de detectores: clase base + registro de plugins).**
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.

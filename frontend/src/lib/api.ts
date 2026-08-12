@@ -91,6 +91,57 @@ export interface EstadoSimbolo {
   ticks_vistos: number
 }
 
+/** Los plazos que compara `GET /mercado/resumen` (`PLAZOS` en `app/resumen.py`). Lista cerrada. */
+export const PLAZOS = ['1h', '24h', '7d'] as const
+
+export type Plazo = (typeof PLAZOS)[number]
+
+/**
+ * Cuánto se movió el precio en un plazo (ver `Cambio` en `app/modelos.py`).
+ *
+ * **`referencia` no está de adorno.** Es el precio contra el que se hizo la cuenta, y es lo que
+ * le permite al panel rehacerla: el backend calculó el porcentaje contra el precio que tenía en
+ * ese momento, pero el WebSocket sigue trayendo precios más nuevos. Con la referencia a mano, el
+ * porcentaje se recalcula acá y se mueve junto al precio en vez de quedar congelado hasta el
+ * próximo refresco. Ver `cambioContra()` en `lib/resumen.tsx`.
+ */
+export interface CambioJSON {
+  porcentaje: string
+  referencia: string
+  momento: string
+}
+
+/**
+ * La ficha de un activo tal cual la manda `GET /mercado/resumen` (paso 2.2a).
+ *
+ * Tres campos que hay que mirar antes de creerle a los números, y que existen justamente para
+ * que el panel no muestre de más:
+ *
+ * - `momento` — de cuándo es el precio. Si Argos estuvo apagado, es viejo.
+ * - `cambios[plazo] === null` — no había con qué comparar. Se muestra "—", **nunca 0%**.
+ * - `minutos_24h` — cuántos de los 1.440 minutos del día tienen datos. Con menos de 1.440 el
+ *   volumen es el de esos minutos y nada más, y el panel lo advierte.
+ */
+export interface ResumenJSON {
+  precio: string
+  momento: string
+  /** `vivo` = último tick en memoria; `guardado` = último cierre en la base (ingesta apagada). */
+  origen_precio: 'vivo' | 'guardado'
+  cambios: Record<Plazo, CambioJSON | null>
+  maximo_24h: string | null
+  minimo_24h: string | null
+  volumen_24h: string | null
+  volumen_cotizado_24h: string | null
+  minutos_24h: number
+  fuente_24h: 'propia' | 'historia' | 'mixta' | null
+}
+
+export interface RespuestaResumen {
+  plazos: string[]
+  /** Un símbolo del que Argos no tiene ningún dato **no aparece** acá. Ausencia ≠ cero. */
+  simbolos: Record<string, ResumenJSON>
+}
+
 /**
  * Los tres mensajes que empuja `WS /ws/mercado` (paso 1.4).
  *
@@ -132,4 +183,27 @@ export async function obtenerVelas(
 
   const datos: RespuestaVelas = await respuesta.json()
   return datos.velas
+}
+
+/**
+ * Trae la ficha de cada activo: precio, cambio %, máximo, mínimo y volumen del día.
+ *
+ * Se piden todos los símbolos de una sola vez —el backend los resuelve en una consulta— en vez
+ * de un pedido por moneda. Con dos da igual; con veinte en la watchlist, no.
+ */
+export async function obtenerResumen(
+  pares: string[],
+  senal?: AbortSignal,
+): Promise<Record<string, ResumenJSON>> {
+  const parametros = new URLSearchParams()
+  for (const par of pares) parametros.append('simbolos', par)
+
+  const respuesta = await fetch(`${URL_API}/mercado/resumen?${parametros}`, { signal: senal })
+
+  if (!respuesta.ok) {
+    throw new Error(`El backend respondió ${respuesta.status} al pedir el resumen de mercado`)
+  }
+
+  const datos: RespuestaResumen = await respuesta.json()
+  return datos.simbolos
 }

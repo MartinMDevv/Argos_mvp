@@ -8,26 +8,59 @@
      Logos reales BTC/ETH · pin (fija → sube y aparece en el menú)
      · chat isla que ocupa espacio a la derecha · pavo placeholder.
      ============================================================ */
+  /* ------------------------------------------------------------------
+     Escala de tintas — medida, no elegida a ojo (auditoría 12-ago)
+     ------------------------------------------------------------------
+     Los contrastes de abajo están calculados contra `--surface`, que es el
+     fondo de las tarjetas donde vive casi todo el texto. WCAG pide 4,5:1 para
+     texto normal.
+
+     Lo que había fallaba: `--faint` daba 2,69:1 en oscuro y 2,79:1 en claro, y
+     con ese color estaban escritos los nombres de las monedas, los encabezados
+     de la tabla, las etiquetas de los KPI y los rótulos de sección. Era el
+     color del que más cosas dependían y el único que no se podía leer.
+
+     Subirlo a secas habría aplastado la jerarquía —`--faint` habría quedado
+     igual de fuerte que `--muted`—, así que la escala se rehizo con cuatro
+     escalones en vez de tres, y el más tenue se reservó para lo que NO es
+     información:
+
+       --text   16,3:1  el dato
+       --muted   7,0:1  texto secundario, se lee sin esfuerzo
+       --faint   4,5:1  etiquetas y encabezados — el mínimo legal
+       --ghost   2,4:1  SOLO adorno (los sellos FIG_02). Nunca información.
+
+     `--line` pasó de 1,20:1 —las tarjetas no se despegaban del fondo— a ~1,6:1,
+     que separa sin gritar. `--line-strong` (3:1) es para el borde de los
+     controles: ahí el borde ES el control y WCAG 1.4.11 sí lo exige.
+     ------------------------------------------------------------------ */
   :root{
     --ground:#060608; --ground-2:#0A0A0D; --surface:#0E0E11; --surface-2:#151519;
-    --line:#212125; --line-soft:#18181C; --text:#ECECEE; --muted:#8A8A91; --faint:#57575F;
+    --line:#2E2E34; --line-soft:#1E1E23; --line-strong:#5E5E62;
+    --text:#ECECEE; --muted:#9B9BA3; --faint:#7A7A82; --ghost:#505058;
     --teal:#1FC8B4; --teal-dim:#116E66; --gold:#E7B23F; --gold-dim:#8b6a24; --bull:#33C176; --bear:#E5484D;
     --radius:13px; --radius-sm:9px; --shadow:0 20px 54px -32px rgba(0,0,0,.95);
     --sans:"Adwaita Sans", system-ui, sans-serif; --mono:"JBMono", ui-monospace, monospace;
   }
+  /* En claro, además, los tres acentos estaban entre 3,4 y 3,6:1 — bien para un
+     ícono grande, corto para un `+0,38%` de 12px. Se oscurecieron a ~5:1 sin
+     moverles el tono, así que la paleta se reconoce igual. */
   @media (prefers-color-scheme: light){
     :root{--ground:#F1F1F3; --ground-2:#EAEAEE; --surface:#FFFFFF; --surface-2:#F4F4F7;
-      --line:#E4E4E9; --line-soft:#EDEDF1; --text:#111114; --muted:#5E5E66; --faint:#9A9AA2;
-      --teal:#0E9C8D; --teal-dim:#0c8376; --gold:#B27C12; --gold-dim:#b27c12; --bull:#1D9E58; --bear:#D23B41;
+      --line:#D5D5DB; --line-soft:#E8E8EE; --line-strong:#959599;
+      --text:#111114; --muted:#585860; --faint:#6D6D75; --ghost:#A7A7AF;
+      --teal:#0A7D71; --teal-dim:#0c8376; --gold:#8F6410; --gold-dim:#b27c12; --bull:#177E46; --bear:#C4353B;
       --shadow:0 16px 34px -26px rgba(20,20,25,.3);}
   }
   :root[data-theme="dark"]{--ground:#060608; --ground-2:#0A0A0D; --surface:#0E0E11; --surface-2:#151519;
-    --line:#212125; --line-soft:#18181C; --text:#ECECEE; --muted:#8A8A91; --faint:#57575F;
+    --line:#2E2E34; --line-soft:#1E1E23; --line-strong:#5E5E62;
+    --text:#ECECEE; --muted:#9B9BA3; --faint:#7A7A82; --ghost:#505058;
     --teal:#1FC8B4; --teal-dim:#116E66; --gold:#E7B23F; --gold-dim:#8b6a24; --bull:#33C176; --bear:#E5484D;
     --shadow:0 20px 54px -32px rgba(0,0,0,.95);}
   :root[data-theme="light"]{--ground:#F1F1F3; --ground-2:#EAEAEE; --surface:#FFFFFF; --surface-2:#F4F4F7;
-    --line:#E4E4E9; --line-soft:#EDEDF1; --text:#111114; --muted:#5E5E66; --faint:#9A9AA2;
-    --teal:#0E9C8D; --teal-dim:#0c8376; --gold:#B27C12; --gold-dim:#b27c12; --bull:#1D9E58; --bear:#D23B41;
+    --line:#D5D5DB; --line-soft:#E8E8EE; --line-strong:#959599;
+    --text:#111114; --muted:#585860; --faint:#6D6D75; --ghost:#A7A7AF;
+    --teal:#0A7D71; --teal-dim:#0c8376; --gold:#8F6410; --gold-dim:#b27c12; --bull:#177E46; --bear:#C4353B;
     --shadow:0 16px 34px -26px rgba(20,20,25,.3);}
 
   *{box-sizing:border-box;}
@@ -40,7 +73,14 @@
   ::-webkit-scrollbar-thumb:hover{background:var(--faint);}
   ::-webkit-scrollbar-track{background:transparent;}
   .num{font-family:var(--mono); font-variant-numeric:tabular-nums;}
-  .mono-l{font-family:var(--mono); font-size:9.5px; letter-spacing:.09em; color:var(--faint); text-transform:uppercase;}
+  /* Rótulo mono en versalitas. Sube de 9,5 a 10,5px: las cuatro medidas que había
+     por debajo de 12px (9 / 9,5 / 10 / 10,5) no formaban escala, eran arbitrarias.
+     Ahora el piso es 10,5 y el siguiente escalón 11,5. Se queda por debajo de 12
+     a propósito —es una consola densa, no un texto de lectura— y lo que lo hace
+     legible es el contraste, que ahora sí cumple. */
+  .mono-l{font-family:var(--mono); font-size:10.5px; letter-spacing:.08em; color:var(--faint); text-transform:uppercase;}
+  /* Los sellos tipo FIG_02: no dicen nada, ordenan. Van en la tinta de adorno. */
+  .mono-l.stamp{color:var(--ghost);}
   .wrap{max-width:1240px; margin:0 auto; padding:22px 20px 56px;}
   .up{color:var(--bull);} .down{color:var(--bear);}
 
@@ -70,7 +110,7 @@
   nav{background:var(--ground); border-right:1px solid var(--line); padding:14px 10px; display:flex; flex-direction:column; gap:2px;}
   .brand{display:flex; align-items:center; gap:11px; padding:6px 8px 12px; cursor:pointer;}
   .wordmark{font-size:19px; font-weight:600; letter-spacing:-.01em; margin:0; color:var(--text);}
-  .navsec{font-size:9px; letter-spacing:.12em; text-transform:uppercase; color:var(--faint); font-weight:700; margin:13px 8px 5px;}
+  .navsec{font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); font-weight:700; margin:13px 8px 5px;}
   .nav-i{display:flex; align-items:center; gap:10px; padding:8px 10px; border-radius:8px; color:var(--muted);
     font-size:13px; font-weight:500; cursor:pointer; border:1px solid transparent; background:none; width:100%;
     text-align:left; font-family:inherit; transition:background .13s, color .13s;}
@@ -108,14 +148,22 @@
   .mhead{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px;}
   .price{font-size:26px; font-weight:700;} .delta{font-size:12.5px; font-weight:600;}
   .mhead .spacer{margin-left:auto;}
-  .tf{display:flex; gap:3px; background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:2px;}
-  .tf button{font-family:var(--mono); font-size:10.5px; color:var(--faint); padding:4px 8px; border-radius:6px; border:0; background:none; cursor:pointer; transition:.13s;}
-  .tf button:hover{color:var(--text);} .tf button.on{color:var(--text); background:var(--surface-2);}
+  /* Selector de tramo. El borde va en `--line-strong` (3:1) y no en `--line`:
+     acá el borde ES el control, y esa es justo la distinción que hace WCAG 1.4.11.
+     Los botones pasaron de ~26×19px a 32×28px — seguían siendo el objetivo más
+     chico de la pantalla y son de los más usados. */
+  .tf{display:flex; gap:2px; background:var(--surface); border:1px solid var(--line-strong); border-radius:9px; padding:3px;}
+  .tf button{font-family:var(--mono); font-size:11.5px; color:var(--faint); min-width:32px; padding:6px 9px;
+    border-radius:6px; border:0; background:none; cursor:pointer; transition:color .13s, background .13s;}
+  .tf button:hover{color:var(--text); background:var(--surface-2);}
+  /* El tramo activo se marca con teal (estructura), no solo con un gris más claro:
+     antes la única diferencia era el fondo, y a 10px eso casi no se veía. */
+  .tf button.on{color:var(--surface); background:var(--teal); font-weight:600;}
   .chatbtn{font-family:inherit; font-size:12px; color:var(--muted); background:var(--surface); border:1px solid var(--line); border-radius:8px; padding:6px 11px; cursor:pointer; display:flex; align-items:center; gap:7px; transition:.15s;}
   .chatbtn:hover{color:var(--text); border-color:var(--teal-dim);} .chatbtn svg{width:14px;height:14px;stroke:currentColor;fill:none;stroke-width:1.7;}
   .mhlogo{display:flex;} .mhlogo .coin{width:28px; height:28px;}
   .mh-id{margin-right:4px;} .mh-id .tk{font-size:13px; font-weight:700; line-height:1.15;}
-  .mh-id .sub{font-size:9.5px; color:var(--faint);}
+  .mh-id .sub{font-size:10.5px; color:var(--faint);}
   .app.chat-open .chatbtn{opacity:0; transform:scale(.8); pointer-events:none; transition:.2s;}
 
   .view{display:none;}
@@ -158,8 +206,24 @@
   @media (max-width:520px){ .statusbar .radar{display:none;} }
 
   .coin{border-radius:50%; overflow:hidden; flex:none;}
-  .asset{display:flex; align-items:center; gap:10px; padding:9px 2px; border-top:1px solid var(--line-soft);}
+  /* El padding izquierdo deja aire entre la marca de seleccionado y el pin. Sin él la barra
+     teal quedaba pegada al botón dorado y los dos se leían como una sola cosa rara. */
+  .asset{display:flex; align-items:center; gap:10px; padding:9px 8px 9px 12px; margin:0 -4px;
+    border-top:1px solid var(--line-soft); cursor:pointer; border-radius:8px;
+    transition:background .13s; position:relative;}
   .asset:first-of-type{border-top:0;}
+  .asset:hover{background:var(--surface);}
+  /* El activo que está mirando el gráfico. Se marca con teal (estructura), no con verde/rojo
+     —reservados para "subió/bajó"— ni con oro, que es la señal de anomalía. La barra va como
+     pseudo-elemento y no como `box-shadow:inset`: así se le puede dar alto y esquinas propias
+     en vez de correr pegada al borde de punta a punta. */
+  .asset.sel{background:color-mix(in srgb,var(--teal) 7%,transparent);}
+  .asset.sel::before{content:""; position:absolute; left:3px; top:50%; translate:0 -50%;
+    width:2.5px; height:22px; border-radius:2px; background:var(--teal);}
+  .mkt tbody tr.sel td{background:color-mix(in srgb,var(--teal) 7%,transparent);}
+  .mkt tbody tr.sel td:first-child{box-shadow:inset 2.5px 0 0 var(--teal);}
+  .pinnav-i.on{background:color-mix(in srgb,var(--teal) 10%,transparent);
+    border-color:color-mix(in srgb,var(--teal) 35%,transparent);}
   .pin{background:var(--surface); border:1px solid var(--line); cursor:pointer; width:26px; height:26px; padding:0;
     display:grid; place-items:center; flex:none; border-radius:7px; transition:.13s;}
   .pin:hover{background:var(--surface-2); border-color:var(--faint);}
@@ -167,8 +231,12 @@
   .pin.on{border-color:color-mix(in srgb,var(--gold) 45%,transparent); background:color-mix(in srgb,var(--gold) 8%,transparent);}
   .pin.on svg{stroke:var(--gold); fill:color-mix(in srgb,var(--gold) 28%,transparent);}
   .asset .coin{width:24px; height:24px;}
-  .asset .id{min-width:0;} .asset .id .tk{font-weight:700; font-size:13px;} .asset .id .nm{color:var(--faint); font-size:10.5px;}
-  .asset .spark2{flex:1; height:22px; min-width:20px;}
+  .asset .id{min-width:0;} .asset .id .tk{font-weight:700; font-size:13px;} .asset .id .nm{color:var(--faint); font-size:11.5px;}
+  /* La curva es contexto, no el dato. Antes tenía `flex:1` y se comía todo el ancho
+     sobrante: terminaba ocupando más que el precio y el porcentaje juntos, que son
+     lo que se viene a leer. Ahora tiene un techo y el aire sobrante queda de aire. */
+  .asset .spark2{flex:0 1 190px; max-width:190px; height:24px; min-width:60px; margin-left:auto; opacity:.85;}
+  .asset:hover .spark2{opacity:1;}
   .asset .rt{text-align:right; flex:none;} .asset .rt .px{font-size:13px; font-weight:600; font-family:var(--mono);} .asset .rt .ch{font-size:11px; font-family:var(--mono);}
   @media (max-width:420px){ .asset .spark2{display:none;} }
 
@@ -188,19 +256,19 @@
   .kpis{display:grid; grid-template-columns:repeat(6,1fr); gap:9px;}
   @media (max-width:860px){ .kpis{grid-template-columns:repeat(3,1fr);} }
   @media (max-width:440px){ .kpis{grid-template-columns:repeat(2,1fr);} }
-  .kpi{border:1px solid var(--line); border-radius:8px; padding:9px 11px; background:var(--surface);}
-  .kpi .l{font-size:9px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); font-weight:700;}
-  .kpi .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:16px; font-weight:600; margin-top:3px;}
-  .kpi .s{font-size:10px; margin-top:1px;}
+  .kpi{border:1px solid var(--line); border-radius:8px; padding:10px 12px; background:var(--surface);}
+  .kpi .l{font-size:10.5px; text-transform:uppercase; letter-spacing:.06em; color:var(--faint); font-weight:700;}
+  .kpi .v{font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:17px; font-weight:600; margin-top:4px;}
+  .kpi .s{font-size:11px; margin-top:2px;}
   .mkt{width:100%; border-collapse:collapse;}
-  .mkt th{ text-align:right; color:var(--faint); font-weight:700; font-size:9px; text-transform:uppercase; letter-spacing:.05em; padding:0 10px 9px; border-bottom:1px solid var(--line);}
+  .mkt th{ text-align:right; color:var(--faint); font-weight:700; font-size:10.5px; text-transform:uppercase; letter-spacing:.05em; padding:0 10px 9px; border-bottom:1px solid var(--line);}
   .mkt th:nth-child(2), .mkt td:nth-child(2){text-align:left;}
   .mkt td{padding:8px 9px; border-bottom:1px solid var(--line-soft); font-family:var(--mono); font-variant-numeric:tabular-nums; font-size:12.5px;}
   .mkt td.pincell{padding:8px 2px 8px 6px;}
   .mkt tbody tr{cursor:pointer; transition:background .12s;} .mkt tbody tr:hover td{background:var(--surface-2);}
   .mkt .sym{font-family:var(--sans); font-weight:700; display:flex; align-items:center; gap:9px;}
   .mkt .sym .coin{width:22px; height:22px;}
-  .mkt .nm2{color:var(--faint); font-family:var(--sans); font-weight:500; font-size:10.5px; display:block;}
+  .mkt .nm2{color:var(--faint); font-family:var(--sans); font-weight:500; font-size:11.5px; display:block;}
   .mkt .addrow td{color:var(--faint); font-family:var(--sans); font-size:11.5px; text-align:center; cursor:default; border-bottom:0;}
   .mkt .addrow:hover td{background:transparent;}
   .minibar{display:inline-block; width:38px; height:7px; border-radius:2px; background:var(--line); overflow:hidden; vertical-align:middle;}

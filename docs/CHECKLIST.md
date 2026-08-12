@@ -65,9 +65,33 @@ TimescaleDB → velas → empujado al panel.
   lejos, el cambio va `null` en vez de un aproximado. Los ticks se escanean solo desde donde termina el
   backfill: medido con `EXPLAIN ANALYZE`, 1.766 filas en vez de ~500.000. Verificado contra
   `/api/v3/ticker/24hr` de Binance: máx y mín idénticos al octavo decimal, volumen a 0,006%.)*
-- [ ] **2.2b** Watchlist BTC/ETH + cabecera del panel con datos reales *(jubila `src/data/coins.ts`,
-  que hoy tiene precios inventados) + selector de moneda/intervalo: el gráfico está fijo en
-  BTCUSDT · 1m y los botones `15m/1H/4H/1D` son decorativos*
+- [x] **2.2b** Watchlist, cabecera, tabla y KPIs con datos reales + selector de moneda e intervalo ✅
+  *(`src/data/coins.ts` **eliminado**. Nuevos: `lib/activos.ts` (catálogo par ↔ símbolo corto),
+  `lib/formato.ts` (números es-CL, y `—` cuando no hay dato — nunca cero), `lib/resumen.tsx`
+  (UN pedido cada 10 s para toda la app) y `Sparkline.tsx` (curvas con velas reales; las de antes
+  eran polilíneas escritas a mano). **El % se recalcula en el navegador** contra el precio vivo del
+  WebSocket, usando la `referencia` que manda el backend: si no, el precio se movería y el
+  porcentaje de al lado quedaría clavado 10 s. Verificado: el recalculado sale idéntico al del
+  backend. El gráfico ya no está clavado en BTCUSDT · 1m y los botones de tramo salen de
+  `INTERVALOS` (antes eran 4 decorativos de los 6 reales). **Bug que apareció al verificar**: el
+  rango de 24 h de ETH salía `1,9K – 1,9K` por redondear a un decimal → ahora usa cifras
+  significativas. Queda en mock solo `PriceVolChart` (la tarjeta lo declara) y la volatilidad σ,
+  que llega con los detectores de la Fase 3.)*
+
+- [x] **2.2c** Arreglos de la primera pasada por el navegador + auditoría de diseño ✅
+  *(**Tres bugs**: (a) al cambiar de tramo la app se ponía en negro — `CandleChart` mandaba el
+  precio en vivo, ya ubicado en el tramo NUEVO, a una serie que todavía tenía dibujado el viejo,
+  y lightweight-charts no acepta actualizar hacia atrás; se resolvió con la marca `datosDe`.
+  (b) El pin salía aplastado: lo había envuelto en un `span` sin `flex:none` para cortar el clic
+  — ahora el corte lo hace el propio `Pin`. (c) Las animaciones se repetían sin parar:
+  `dangerouslySetInnerHTML={{…}}` creaba un objeto nuevo por render y React reescribía el SVG
+  entero; el objeto se sacó fuera del componente en `Peacock`, `Radar`, `IsoLayers` y `CoinLogo`.
+  Además, seleccionar un activo ya no te expulsa de la vista Mercados.
+  **Auditoría con `ui-ux-pro-max`** (instalado como plugin): `--faint` fallaba contraste en los
+  dos temas y era el color de casi todas las etiquetas → escala de tintas rehecha en 4 escalones
+  con `--ghost` para lo decorativo, `--line-strong` para bordes de control, acentos del tema
+  claro de ~3,5:1 a ~5:1, piso tipográfico de 9 a 10,5 px, y los botones de tramo de ~26×19 a
+  32×28 px con el activo en teal. Ver ARQUITECTURA.md → "La escala de tintas, medida".)*
 
 ## FASE 3 — Detectores de alertas (el corazón)
 - [ ] **3.1** Framework de detectores (clase base + registro de plugins)

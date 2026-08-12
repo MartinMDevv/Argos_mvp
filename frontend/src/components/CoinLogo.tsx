@@ -6,13 +6,23 @@ const LOGOS: Record<string, string> = {
   ETH: '<circle cx="16" cy="16" r="16" fill="#627EEA"/><g fill="#fff"><polygon fill-opacity=".6" points="16,4 16,12.87 23.5,16.22"/><polygon points="16,4 8.5,16.22 16,12.87"/><polygon fill-opacity=".6" points="16,21.97 16,27.99 23.5,17.62"/><polygon points="16,27.99 16,21.97 8.5,17.62"/><polygon fill-opacity=".2" points="16,20.57 23.5,16.22 16,12.88"/><polygon fill-opacity=".6" points="8.5,16.22 16,20.57 16,12.88"/></g>',
 }
 
+// Un objeto por símbolo, creado una sola vez. React compara `dangerouslySetInnerHTML` por
+// identidad del objeto, así que armarlo dentro del render haría que reescribiera el SVG en cada
+// pasada — acá no se nota (los logos no se animan), pero son dos SVG reconstruidos por fila cada
+// medio segundo. La explicación larga de por qué esto importa está en `Peacock.tsx`.
+const HTML: Record<string, { __html: string }> = Object.fromEntries(
+  Object.entries(LOGOS).map(([sym, svg]) => [sym, { __html: svg }]),
+)
+
+const VACIO = { __html: '' }
+
 export function CoinLogo({ sym, className = '' }: { sym: string; className?: string }) {
   return (
     <svg
       className={`coin ${className}`}
       viewBox="0 0 32 32"
       aria-hidden="true"
-      dangerouslySetInnerHTML={{ __html: LOGOS[sym] ?? '' }}
+      dangerouslySetInnerHTML={HTML[sym] ?? VACIO}
     />
   )
 }

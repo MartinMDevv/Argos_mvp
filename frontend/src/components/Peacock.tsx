@@ -1,6 +1,8 @@
 // Logo de Argos: pavo real (cuerpo/cuello de cisne + cola de abanico que se abre).
 // El SVG se genera con las mismas fórmulas del boceto. La animación de apertura
-// vive en el CSS (.peacock.anim ...) y corre al montar.
+// vive en el CSS (.peacock.anim ...) y corre UNA sola vez por carga de página.
+
+import { memo, useEffect, useState } from 'react'
 
 function buildPeacockInner(): string {
   // 12 plumas grandes + anillo interno corto de relleno
@@ -28,21 +30,60 @@ function buildPeacockInner(): string {
   return `<g class="tail">${inn}${out}</g>${body}`
 }
 
-// Se calcula una sola vez (el markup no depende de props).
-const PEACOCK_INNER = buildPeacockInner()
+/**
+ * El markup, envuelto en su objeto, calculado UNA sola vez.
+ *
+ * ## Por qué el objeto vive acá afuera y no dentro del render
+ * Esta línea es el arreglo de "el logo se anima todo el rato", y vale entenderla porque el mismo
+ * error estaba en `Radar.tsx`, `IsoLayers.tsx` y `CoinLogo.tsx`.
+ *
+ * React compara `dangerouslySetInnerHTML` **por identidad del objeto**, no por el string que
+ * lleva adentro. Escrito como `dangerouslySetInnerHTML={{ __html: … }}` se crea un objeto nuevo
+ * en cada render, así que React siempre lo ve distinto y reescribe el `innerHTML` del SVG entero
+ * — nodos nuevos, y con nodos nuevos las animaciones CSS **arrancan de cero**.
+ *
+ * Antes esto no se notaba porque el menú se renderizaba una vez y quedaba quieto. En el paso
+ * 2.2b el menú pasó a mostrar el cambio % de los fijados, o sea que se renderiza cada medio
+ * segundo con cada precio que llega por WebSocket: el abanico se reabría dos veces por segundo.
+ *
+ * Sacando el objeto del render la identidad es estable, React no toca el DOM y la animación
+ * corre una vez. De paso deja de reconstruirse un SVG de veinte nodos dos veces por segundo.
+ */
+const PEACOCK_INNER = { __html: buildPeacockInner() }
 
-export function Peacock({
+/**
+ * Si el abanico ya se abrió alguna vez en esta carga de la página.
+ *
+ * La cola se abre **una vez, al entrar a Argos**: es un saludo, no un loop. Esto cubre el otro
+ * camino por el que se repetía —que el componente se desmonte y se vuelva a montar (una recarga
+ * en caliente, un cambio de layout responsive)—, que la identidad estable del objeto no evita.
+ *
+ * Es una variable de módulo y no estado de React a propósito: tiene que sobrevivir al desmontaje
+ * del componente, que es justamente el evento del que nos queremos defender.
+ */
+let yaSeAbrio = false
+
+export const Peacock = memo(function Peacock({
   size = 100,
   anim = false,
   className = '',
 }: { size?: number; anim?: boolean; className?: string }) {
+  // Se decide en el primer render de este montaje y no cambia después. El inicializador no
+  // escribe la marca —eso va en el efecto— para que siga siendo puro: React lo invoca dos veces
+  // en modo estricto, y una función con efectos secundarios acá daría resultados distintos.
+  const [animar] = useState(() => anim && !yaSeAbrio)
+
+  useEffect(() => {
+    if (anim) yaSeAbrio = true
+  }, [anim])
+
   return (
     <svg
-      className={`peacock ${anim ? 'anim' : ''} ${className}`}
+      className={`peacock ${animar ? 'anim' : ''} ${className}`}
       viewBox="0 0 100 100"
       style={{ width: size, height: size }}
       aria-label="Argos"
-      dangerouslySetInnerHTML={{ __html: PEACOCK_INNER }}
+      dangerouslySetInnerHTML={PEACOCK_INNER}
     />
   )
-}
+})

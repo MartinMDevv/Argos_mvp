@@ -24,7 +24,12 @@ dist-ssr/
 .vite/
 
 # === Datos y volúmenes locales de la BD ===
-data/
+# Anclado a la raíz con la barra del principio, y no suelto.
+# Sin ancla, `data/` ignora CUALQUIER carpeta llamada así en cualquier nivel del repo, y eso ya
+# mordió una vez: `frontend/src/data/coins.ts` quedó fuera del control de versiones sin que nadie
+# se enterara, así que el frontend no compilaba desde un clon limpio (los componentes importaban
+# un archivo que no estaba). Se descubrió en el paso 2.2b, justo al borrarlo.
+/data/
 *.sqlite
 *.db
 

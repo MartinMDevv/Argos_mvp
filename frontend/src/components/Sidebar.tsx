@@ -1,4 +1,6 @@
-import { COINS } from '@/data/coins'
+import { activoDe } from '@/lib/activos'
+import { SIN_DATO, direccion, porcentaje } from '@/lib/formato'
+import { useFichas } from '@/lib/resumen'
 import { Peacock } from './Peacock'
 import { CoinLogo } from './CoinLogo'
 import { Icon } from './Icon'
@@ -10,12 +12,26 @@ interface Props {
   openChat: () => void
   order: string[]
   pinned: Record<string, boolean>
+  par: string
+  seleccionar: (par: string) => void
   theme: 'dark' | 'light'
   toggleTheme: () => void
 }
 
-export function Sidebar({ view, setView, openChat, order, pinned, theme, toggleTheme }: Props) {
-  const pins = order.filter(s => pinned[s])
+export function Sidebar({
+  view,
+  setView,
+  openChat,
+  order,
+  pinned,
+  par,
+  seleccionar,
+  theme,
+  toggleTheme,
+}: Props) {
+  const pins = order.filter((p) => pinned[p])
+  const fichas = useFichas(pins)
+
   return (
     <nav>
       <div className="brand">
@@ -39,17 +55,35 @@ export function Sidebar({ view, setView, openChat, order, pinned, theme, toggleT
         <Icon name="chat" /> <span className="lbl">Chat con Argos</span>
       </button>
 
+      {/* Los fijados son también el selector de moneda: hacer clic cambia lo que mira el gráfico.
+          El cambio de 24 h va al lado, real y moviéndose, para poder elegir mirando. */}
       <div className="navsec">Fijados</div>
       <div className="pinnav">
-        {pins.length === 0
-          ? <div className="empty">Sin activos fijados</div>
-          : pins.map(s => (
-            <button type="button" className="pinnav-i" key={s} title={COINS[s].name}>
-              <CoinLogo sym={s} />
-              <span className="tk">{s}</span>
-              <span className={`ch ${COINS[s].dir}`}>{COINS[s].ch}</span>
-            </button>
-          ))}
+        {pins.length === 0 ? (
+          <div className="empty">Sin activos fijados</div>
+        ) : (
+          pins.map((parFijado, i) => {
+            const activo = activoDe(parFijado)
+            const cambio = fichas[i]?.cambios['24h'] ?? null
+            if (!activo) return null
+
+            return (
+              <button
+                type="button"
+                className={`pinnav-i ${parFijado === par ? 'on' : ''}`}
+                key={parFijado}
+                title={activo.nombre}
+                onClick={() => seleccionar(parFijado)}
+              >
+                <CoinLogo sym={activo.simbolo} />
+                <span className="tk">{activo.simbolo}</span>
+                <span className={`ch ${direccion(cambio)}`}>
+                  {cambio === null ? SIN_DATO : porcentaje(cambio)}
+                </span>
+              </button>
+            )
+          })
+        )}
       </div>
 
       <div className="navsec">Cuenta</div>

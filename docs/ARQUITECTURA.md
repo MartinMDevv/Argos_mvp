@@ -249,13 +249,14 @@ frontend/
 ├── tsconfig.*.json          → TypeScript (paths del alias "@")
 └── src/
     ├── main.tsx             → monta <App/> en #root
-    ├── App.tsx              → estado global: vista, chat abierto, activos fijados, tema
+    ├── App.tsx              → estado global: vista, activo y tramo elegidos, chat, fijados, tema
     ├── index.css            → SISTEMA DE DISEÑO: tokens (ambos temas), @font-face, estilos de componentes
-    ├── data/
-    │   └── coins.ts         → datos mock BTC/ETH (los usan aún watchlist/tabla/sidebar → paso 2.2)
     ├── lib/
-    │   ├── api.ts           → puente REST: URL del backend, tipos de la API, obtenerVelas() (2.1)
+    │   ├── api.ts           → puente REST: URL del backend, tipos, obtenerVelas() + obtenerResumen()
+    │   ├── activos.ts       → catálogo: par (BTCUSDT) ↔ símbolo corto (BTC) ↔ nombre (2.2b)
+    │   ├── formato.ts       → cómo se escriben los números (es-CL, signos, "—" cuando no hay) (2.2b)
     │   ├── mercado.tsx      → ProveedorMercado: LA conexión WebSocket + hooks para leerla (2.1)
+    │   ├── resumen.tsx      → ProveedorResumen: EL pedido de resumen + Ficha por activo (2.2b)
     │   └── useTheme.ts      → hook de tema claro/oscuro (escribe data-theme en <html>)
     ├── assets/fonts/        → Adwaita Sans + JetBrains Mono (subseteadas, .woff2)
     └── components/
@@ -268,7 +269,8 @@ frontend/
         ├── PulseCard.tsx       → StatusBar (banner + radar) y PulseCard ("Lo que Argos vio")
         ├── MarketTable.tsx     → tabla densa de activos vigilados
         ├── CandleChart.tsx     → gráfico de velas con lightweight-charts y DATOS REALES (2.1)
-        ├── PriceVolChart.tsx   → precio (área) + histograma de volumen en canvas
+        ├── Sparkline.tsx       → la curvita de precio de watchlist y tabla, con velas reales (2.2b)
+        ├── PriceVolChart.tsx   → precio (área) + volumen en canvas — ⚠️ ÚLTIMO MOCK que queda
         ├── Peacock.tsx         → logo pavo real (SVG generado; PLACEHOLDER)
         ├── CoinLogo.tsx        → logos oficiales BTC/ETH
         ├── Icon.tsx            → íconos de línea reutilizables
@@ -286,11 +288,54 @@ frontend/
 - Tailwind v4 está instalado y disponible para utilidades; el look afinado vive como CSS de componentes.
 
 **Convenciones del frontend:**
-- Import con alias `@` → `src` (ej. `import { COINS } from '@/data/coins'`).
+- Import con alias `@` → `src` (ej. `import { useFicha } from '@/lib/resumen'`).
 - Comentarios en español.
-- El **gráfico ya usa datos reales** (2.1). Siguen en mock la watchlist, la tabla y el sidebar → paso 2.2.
+- **Un activo se identifica siempre por su PAR** (`BTCUSDT`), que es como lo llama el backend. El
+  símbolo corto (`BTC`) y el nombre salen del catálogo (`lib/activos.ts`) y son **solo para mostrar**.
+  Antes del 2.2b convivían las dos formas sin traductor y cada componente resolvía la diferencia como
+  podía; un solo idioma adentro evita el clásico "acá era BTC y allá BTCUSDT".
+- **Los números se formatean en `lib/formato.ts`, nunca a mano.** Formato chileno vía `Intl` (punto de
+  miles, coma decimal) y signo menos de verdad (`−`, U+2212). Cuando no hay dato va `SIN_DATO` (`—`),
+  **nunca un cero**: un cero afirma "no se movió" y eso es decir algo que no sabemos.
+- **Datos reales en todo el panel** desde el 2.2b. El único mock que queda es `PriceVolChart.tsx`,
+  y la tarjeta que lo contiene lo dice en su encabezado.
+- **Nunca escribir `dangerouslySetInnerHTML={{ __html: … }}` dentro del render.** El objeto va
+  fuera del componente. React compara esa prop **por identidad del objeto**, no por el string:
+  uno nuevo en cada pasada hace que reescriba el `innerHTML` del SVG entero, y con nodos nuevos
+  las animaciones CSS arrancan de cero. Es el bug de "el logo se anima todo el rato" — aparecía
+  en `Peacock`, `Radar`, `IsoLayers` y `CoinLogo`, y solo se hizo visible cuando el paso 2.2b
+  puso datos en vivo en el menú y en la tabla, que pasaron a renderizarse dos veces por segundo.
 - ⚠️ El **logo del pavo real** (`Peacock.tsx`) es un placeholder dibujado en SVG a mano →
   reemplazar por un vector pulido cuando esté.
+
+**La escala de tintas, medida** (auditoría del 12-ago con `ui-ux-pro-max`):
+
+Los contrastes se calculan contra `--surface`, el fondo de las tarjetas donde vive casi todo el
+texto. El problema de fondo era `--faint`: **2,69:1 en oscuro y 2,79:1 en claro**, contra el
+mínimo de 4,5:1 de WCAG — y con ese color estaban escritos los nombres de las monedas, los
+encabezados de la tabla, las etiquetas de los KPI y los rótulos del menú. Era el color del que
+más cosas dependían y el único ilegible.
+
+Subirlo a secas habría aplastado la jerarquía (`--faint` habría quedado igual de fuerte que
+`--muted`), así que la escala pasó de tres escalones a cuatro y el más tenue se reservó para lo
+que **no** es información:
+
+| Token | Oscuro | Claro | Para qué |
+|---|---|---|---|
+| `--text` | 16,3:1 | 18,9:1 | el dato |
+| `--muted` | 7,0:1 | 7,1:1 | texto secundario |
+| `--faint` | 4,5:1 | 5,1:1 | etiquetas y encabezados — el mínimo legal |
+| `--ghost` | 2,4:1 | 2,4:1 | **solo adorno** (los sellos `FIG_02`). Nunca información. |
+
+Además: `--line` pasó de 1,20:1 (las tarjetas no se despegaban del fondo) a ~1,45:1; se agregó
+`--line-strong` (3:1) para el borde de los **controles**, que es donde WCAG 1.4.11 sí lo exige;
+y en tema claro los tres acentos estaban entre 3,4 y 3,6:1 — bien para un ícono, corto para un
+`+0,38%` de 12 px — así que se oscurecieron a ~5:1 sin moverles el tono.
+
+**Lo que la auditoría confirmó que ya estaba bien**: el anillo de foco global (`:focus-visible`),
+`prefers-reduced-motion` respetado en las cinco animaciones, la tabla con `overflow-x:auto`, y
+—la regla de "no comunicar solo con color"— los porcentajes que ya viajan con su signo `+`/`−`,
+así que se entienden en escala de grises.
 
 **Cómo llegan los datos al gráfico** (decidido en el paso 2.1):
 
@@ -321,6 +366,39 @@ frontend/
 - **Las velas viven en un `ref`, no en estado**: cambian varias veces por segundo y no queremos un render de
   React por cada una — el gráfico se actualiza solo, por su propia API. Lo único que va a estado es *si hay
   o no hay* velas, porque eso sí decide qué se muestra.
+
+**Cómo se llena el resto del panel** (decidido en el paso 2.2b):
+
+Watchlist, cabecera, tabla y KPIs dejaron de leer `data/coins.ts` —precios y porcentajes inventados del
+boceto— y pasaron a `GET /mercado/resumen`. **Ese archivo ya no existe.**
+
+- **Un solo proveedor**, `lib/resumen.tsx`, con la misma lógica que el del WebSocket: cinco componentes
+  necesitan estos datos y cinco `fetch` en bucle serían cinco pollings pidiendo lo mismo, reiniciándose
+  en cada cambio de vista. Un pedido cada 10 s arriba del todo, y todos leen de ahí. Se repregunta
+  además al volver a la pestaña: el navegador congela los temporizadores en segundo plano, así que al
+  volver de un rato largo lo que hay en pantalla puede tener horas.
+- **El porcentaje se recalcula en el navegador, y para eso está `referencia`.** El REST refresca cada
+  10 s y el WebSocket cada 0,5 s: si nos quedáramos con el porcentaje que calculó el backend, el precio
+  de la watchlist se movería y el `+1,84%` de al lado quedaría clavado — dos números contradiciéndose en
+  la misma fila. Por eso al backend no se le pide el resultado sino **el punto de partida**: cada cambio
+  viene con el precio de hace 24 h, y la división se rehace acá contra el precio vivo.
+  **Verificado**: el porcentaje recalculado sale idéntico al del backend (`+0,13%` vs `0.13`).
+  Lo que *no* se hace es inventar la referencia: si el backend dijo `null`, acá sigue siendo `null`.
+- **Una identidad por activo: el par.** Todo el estado (seleccionado, fijados, claves de diccionario,
+  argumentos de llamada) usa `BTCUSDT`. `lib/activos.ts` traduce al `BTC` que se muestra.
+- **Los sparklines pasaron a ser reales.** Un número inventado ya es malo; un **gráfico** inventado es
+  peor, porque no se lee como un dato sino como una forma — nadie verifica una curva, se la cree. Salen
+  de `/mercado/velas` con pocas velas anchas (24 de 1 h, 42 de 4 h): una curva de 70 píxeles no
+  distingue más detalle, y pedir 1.440 velas de 1 minuto sería mover mil veces más datos de los que se
+  ven. Sin datos no se dibuja nada — una línea plana diría "no se movió".
+- **Lo que no se sabe se muestra como `—`, nunca como cero.** Aplica a los plazos que el backend manda
+  en `null` (falta historia) y a la volatilidad σ, que la va a calcular el detector de z-score en la
+  Fase 3. Un `3,4σ` de relleno se leería como una medición.
+- **`minutos_24h` se muestra.** Si la cobertura del día es parcial, el KPI de volumen lo dice en oro
+  (`parcial · 1.435/1.440 min`) en vez de presentar el volumen de 1.435 minutos como el del día.
+- **Bug que encontró la verificación**: el rango de 24 h se abreviaba con un decimal y en ETH salía
+  `1,9K – 1,9K` —dos números distintos con el mismo texto—, que sugiere que el precio no se movió. Se
+  cambió a cifras significativas: la precisión se adapta a la magnitud en vez de a la unidad.
 
 ## 🗄️ infra/ — Docker Compose (TimescaleDB)
 

@@ -86,6 +86,21 @@ export function CandleChart({ simbolo = 'BTCUSDT', intervalo = '1m', altura = 23
   /** Lo que vimos por WebSocket del tramo en curso; se pisa cuando empieza uno nuevo. */
   const observado = useRef<Observado | null>(null)
 
+  /**
+   * De qué símbolo e intervalo son las velas que la serie tiene dibujadas **ahora mismo**.
+   *
+   * Hace falta porque al cambiar de tramo hay un instante en que el componente ya piensa en el
+   * intervalo nuevo pero la serie todavía muestra el viejo: el efecto que trae la historia sale a
+   * la red (asíncrono) y el que mueve la vela en curso corre enseguida, en el mismo commit.
+   *
+   * Sin esta marca pasaba esto: al tocar `1d`, el precio del WebSocket se ubicaba en el tramo de
+   * hoy a las 00:00 —correcto para 1d— y se lo mandaba a una serie que seguía llena de velas de
+   * 1 minuto que llegaban hasta hace un rato. lightweight-charts **no acepta actualizar hacia
+   * atrás**, tiraba una excepción, y sin error boundary React desmontaba la app entera: pantalla
+   * negra. La marca hace que el precio en vivo espere a que lleguen las velas del tramo nuevo.
+   */
+  const datosDe = useRef<string | null>(null)
+
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   // Las velas viven en un `ref` (cambian muchas veces por segundo y no queremos un re-render por
@@ -190,9 +205,14 @@ export function CandleChart({ simbolo = 'BTCUSDT', intervalo = '1m', altura = 23
     const control = new AbortController()
     let temporizador: number | undefined
 
+    // Lo que identifica a los datos que vamos a pedir. La serie sigue mostrando los anteriores
+    // hasta que estos lleguen — se deja a propósito, para no parpadear en negro por cada clic.
+    const clave = `${simbolo}|${intervalo}`
+
     // Cambió el símbolo o el intervalo: lo que teníamos ya no sirve.
     velas.current = []
     observado.current = null
+    datosDe.current = null
     setCargando(true)
     setError(null)
     setHayVelas(false)
@@ -202,6 +222,9 @@ export function CandleChart({ simbolo = 'BTCUSDT', intervalo = '1m', altura = 23
 
       velas.current = fusionar(velas.current, nuevas)
       setHayVelas(velas.current.length > 0)
+      // Desde acá la serie ya muestra el símbolo y el tramo pedidos: el precio en vivo puede
+      // volver a tocarla. Antes de esta línea todavía tiene lo anterior dibujado.
+      datosDe.current = clave
 
       // Guardamos y devolvemos el encuadre: sin esto, cada corrección devolvería la vista al
       // final y le arrebataría el zoom al usuario justo mientras mira algo.
@@ -246,6 +269,10 @@ export function CandleChart({ simbolo = 'BTCUSDT', intervalo = '1m', altura = 23
   // -------------------------------------------------------------------------
   useEffect(() => {
     if (!estado || !serie.current) return
+
+    // La serie todavía tiene dibujado otro símbolo u otro tramo: se espera. Tocarla ahora sería
+    // meterle una vela que no encaja con las que muestra, y ahí es donde reventaba (ver `datosDe`).
+    if (datosDe.current !== `${simbolo}|${intervalo}`) return
 
     const precio = Number(estado.precio)
     const momento = Date.parse(estado.momento) / 1000
@@ -297,7 +324,7 @@ export function CandleChart({ simbolo = 'BTCUSDT', intervalo = '1m', altura = 23
     }
 
     serie.current.update(vela)
-  }, [estado, intervalo])
+  }, [estado, intervalo, simbolo])
 
   const sinDatos = !cargando && !error && !hayVelas
 
