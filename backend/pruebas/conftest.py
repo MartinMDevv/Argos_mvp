@@ -3,8 +3,8 @@
 ## Por qué las pruebas no necesitan Docker
 Ninguna prueba de esta carpeta abre una conexión, ni a la base ni a Binance. No es una
 casualidad ni una limitación: es la comprobación del argumento de diseño del paso 3.1.
-Un detector recibe todo lo que necesita en su `ContextoDeEvaluacion` y devuelve una
-alerta o `None`, así que probarlo es armarle un contexto a mano y mirar qué sale.
+Un detector recibe todo lo que necesita en su `ContextoDeEvaluacion` y devuelve las
+alertas que encontró, así que probarlo es armarle un contexto a mano y mirar qué sale.
 
 Si algún día una prueba de detectores empieza a pedir la base, la pregunta no es cómo
 levantarla en el CI: es qué se rompió en el diseño.
@@ -89,9 +89,11 @@ def hacer_contexto(
 
 # -- Detectores de mentira ----------------------------------------------------
 #
-# Las pruebas usan estos y NO los de `app/detectores/humo.py`. Los de humo son
-# andamios que se borran en el paso 3.2, y una prueba que dependa de ellos se
-# rompería sola ese día por un motivo que no tiene nada que ver con lo que prueba.
+# Las pruebas de la maquinaria usan estos y NO los detectores de verdad. Ya pasó una
+# vez: los andamios `humo.py` del 3.1 se borraron en el 3.2, y cualquier prueba que
+# hubiera dependido de ellos se habría roto ese día por un motivo que no tiene nada que
+# ver con lo que probaba. Un detector real se prueba en su propio archivo
+# (`test_umbral_precio.py`); la maquinaria se prueba con estos.
 
 
 class DetectorQueSiempreEmite(Detector):
@@ -103,13 +105,15 @@ class DetectorQueSiempreEmite(Detector):
     cadencia = Cadencia.POR_TICK
     silencio = timedelta(minutes=5)
 
-    def evaluar(self, contexto: ContextoDeEvaluacion) -> Alerta | None:
-        return self.alerta(
-            contexto,
-            severidad="info",
-            detalle="Siempre encuentro algo.",
-            evidencia={"precio": str(contexto.precio)},
-        )
+    def evaluar(self, contexto: ContextoDeEvaluacion) -> list[Alerta]:
+        return [
+            self.alerta(
+                contexto,
+                severidad="info",
+                detalle="Siempre encuentro algo.",
+                evidencia={"precio": str(contexto.precio)},
+            )
+        ]
 
 
 class DetectorQueNuncaEmite(Detector):
@@ -121,8 +125,8 @@ class DetectorQueNuncaEmite(Detector):
     cadencia = Cadencia.POR_TICK
     silencio = timedelta(0)
 
-    def evaluar(self, contexto: ContextoDeEvaluacion) -> Alerta | None:
-        return None
+    def evaluar(self, contexto: ContextoDeEvaluacion) -> list[Alerta]:
+        return []
 
 
 class DetectorConHistoria(Detector):
@@ -136,16 +140,18 @@ class DetectorConHistoria(Detector):
     velas_necesarias = 3
     silencio = timedelta(0)
 
-    def evaluar(self, contexto: ContextoDeEvaluacion) -> Alerta | None:
+    def evaluar(self, contexto: ContextoDeEvaluacion) -> list[Alerta]:
         vela = contexto.ultima_cerrada
         if vela is None:
-            return None
-        return self.alerta(
-            contexto,
-            severidad="aviso",
-            detalle=f"Cerró en {vela.cierre}.",
-            evidencia={
-                "cierre": str(vela.cierre),
-                "velas_cerradas": str(len(contexto.velas_cerradas)),
-            },
-        )
+            return []
+        return [
+            self.alerta(
+                contexto,
+                severidad="aviso",
+                detalle=f"Cerró en {vela.cierre}.",
+                evidencia={
+                    "cierre": str(vela.cierre),
+                    "velas_cerradas": str(len(contexto.velas_cerradas)),
+                },
+            )
+        ]

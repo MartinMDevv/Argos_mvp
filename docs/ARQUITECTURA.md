@@ -49,12 +49,14 @@ backend/
 │   │   ├── silencio.py  → el antirruido: cuándo callarse aunque haya algo que decir
 │   │   ├── motor.py     → quién pregunta, cuándo, y qué hace con la respuesta
 │   │   ├── almacen.py   → guarda y lee alertas en la tabla `alertas`
-│   │   └── humo.py      → ⚠️ andamios de verificación del 3.1; SE BORRAN en el paso 3.2
+│   │   ├── umbrales.py  → la configuración de la alerta #1: copia en memoria + tabla (3.2)
+│   │   └── umbral_precio.py → alerta #1: el precio cruzó una línea que pusiste vos (3.2)
 │   └── main.py          → la app FastAPI; endpoints + arranque de las tareas de fondo
 ├── sql/
 │   ├── 001_ticks.sql            → tabla `ticks` como hypertable + índices
 │   ├── 002_velas_historicas.sql → velas de 1m traídas de Binance (la historia que nos perdimos)
-│   └── 003_alertas.sql          → tabla `alertas` (tabla normal, NO hypertable: son pocas por diseño)
+│   ├── 003_alertas.sql          → tabla `alertas` (tabla normal, NO hypertable: son pocas por diseño)
+│   └── 004_umbrales.sql         → tabla `umbrales`: los precios que vos elegiste vigilar (3.2)
 ├── pruebas/             → pytest. Ninguna necesita Docker ni internet (paso 3.1)
 │   ├── conftest.py      → fábricas de datos + detectores de mentira + aislamiento del registro
 │   ├── test_registro.py → que un detector mal definido reviente AL ARRANCAR
@@ -289,7 +291,35 @@ concretos. Acá es un decorador (`@registrar`) más un descubrimiento automátic
   alertas son pocas por diseño; si algún día hicieran falta particiones por tiempo, el problema no
   sería la tabla sino que Argos se volvió el ruido del que quería protegerte.
 
-**Las pruebas** (`backend/pruebas/`, `uv run pytest`) — 57 y corren en 0,06 s. Que ninguna necesite
+### Alerta #1 — umbral de precio: cruzar no es estar (paso 3.2)
+
+El primer detector de verdad, y el más simple de los cuatro, porque el criterio no lo pone Argos: lo
+ponés vos. La parte que no es obvia:
+
+- **La versión ingenua está mal.** `if precio > umbral: avisar` sigue siendo verdadera mientras BTC se
+  quede arriba de 70.000 —horas, días—, así que Argos te contaría lo mismo una y otra vez. Lo que se
+  detecta es la **transición**, y una transición no se ve en un instante: hace falta saber de qué lado
+  estaba el precio la vez anterior.
+- **La única memoria que un detector se permite.** El de umbrales guarda, por cada línea, de qué lado
+  vio el precio la última vez. Es un dato derivado de los ticks que ya pasaron, así que no rompe la
+  reproducibilidad: misma secuencia de operaciones → mismas alertas, que es lo que hace falta para
+  poder correrlo sobre la historia más adelante. Lo que sigue prohibido es salir a buscar datos.
+- **Recién despierto no inventa un cruce.** Argos arranca, el primer tick dice 71.000 y hay un umbral
+  en 70.000: no avisa. No vio ningún cruce, se despertó y el precio ya estaba ahí. El costo es que un
+  reinicio puede perderse un cruce; el beneficio es que Argos nunca fecha hoy algo que pasó mientras
+  estaba apagado. Verificado en vivo.
+- **La línea pertenece al lado de abajo.** Un precio exactamente igual al umbral cuenta como "abajo",
+  así que "avisame si sube de 70.000" avisa a los 70.000,01 y "avisame si baja de 3.400" avisa al tocar
+  3.400 justo. La regla tenía que ser una de las dos; esta hace que ninguna de las dos frases mienta.
+- **Contra el precio que baila sobre la línea actúa el silencio del motor**, no una histéresis. Medido
+  en vivo: 11 cruces reales, todos correctos, todos la misma noticia, todos callados. Si algún día 15
+  minutos no alcanzan, el escalón siguiente es la histéresis; hoy sería un ajuste más que entender.
+- **La configuración se recarga sola cada 60 s**, además de actualizarse al crear o borrar por la API.
+  El motivo es el arranque con la base caída: sin la recarga, el catálogo quedaría vacío, el detector
+  no vigilaría nada y todo se vería normal. Por eso `GET /umbrales` expone `cargado_alguna_vez`, que
+  distingue "no hay umbrales" de "no pudimos enterarnos de si los hay".
+
+**Las pruebas** (`backend/pruebas/`, `uv run pytest`) — 80 y corren en 0,07 s. Que ninguna necesite
 Docker ni internet **es** la comprobación del diseño: si mañana una prueba de detectores empieza a
 pedir la base, la pregunta no es cómo levantarla, es qué se rompió. Dos decisiones que conviene no
 deshacer:

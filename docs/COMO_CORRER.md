@@ -73,6 +73,17 @@ Verificar:
   Filtrable: `?simbolo=BTCUSDT`, `?detector=umbral_precio`, `?limite=100`.
   Cada alerta trae su `evidencia`: los números crudos con los que el detector concluyó, para que
   puedas rehacer la cuenta.
+- http://localhost:8000/umbrales → los precios que pediste vigilar (alerta #1, paso 3.2).
+  Para agregar uno:
+  ```bash
+  curl -X POST localhost:8000/umbrales -H 'Content-Type: application/json' \
+    -d '{"simbolo":"BTCUSDT","valor":"70000","direccion":"arriba","nota":"objetivo"}'
+  curl -X DELETE localhost:8000/umbrales/1      # dejar de vigilarlo
+  ```
+  **Ojo con dos cosas.** (a) Si al crearlo el precio ya está del otro lado, no vas a recibir un aviso
+  inmediato: el detector avisa cuando ve **cruzar**, y encontrarlo ya cruzado no es haberlo visto
+  cruzar. (b) Si `cargado_alguna_vez` sale `false`, Argos todavía no pudo leer la tabla y la lista
+  vacía **no significa que no haya umbrales**: significa que no sabemos. Se reintenta cada minuto.
 - http://localhost:8000/docs → documentación interactiva (Swagger)
 
 > **Desde el paso 1.2 la API se conecta sola a Binance al arrancar** y empieza a guardar ticks.

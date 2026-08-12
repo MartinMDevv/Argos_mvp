@@ -206,7 +206,7 @@ class MotorDeDetectores:
             return
 
         try:
-            alerta = detector.evaluar(contexto)
+            alertas = detector.evaluar(contexto)
         except Exception as error:
             # Un detector roto es un detector roto, no un Argos roto. Se anota y se sigue:
             # los otros tres tienen que poder seguir vigilando.
@@ -216,22 +216,23 @@ class MotorDeDetectores:
             )
             return
 
-        if alerta is None:
-            return  # la respuesta normal y deseable
+        # Un detector puede encontrar varias cosas a la vez (ver el docstring de
+        # `Detector.evaluar`). Cada una pasa por el antirruido por separado, porque
+        # cada una tiene su propia clave: que una se calle no debe callar a las otras.
+        for alerta in alertas:
+            if not self.silencio.permite(alerta.clave, alerta.momento, detector.silencio):
+                continue
 
-        if not self.silencio.permite(alerta.clave, alerta.momento, detector.silencio):
-            return
+            self.silencio.anotar(alerta.clave, alerta.momento)
+            self._encolar(alerta)
 
-        self.silencio.anotar(alerta.clave, alerta.momento)
-        self._encolar(alerta)
-
-        logger.info(
-            "ALERTA [%s] %s · %s — %s",
-            alerta.severidad,
-            alerta.titulo,
-            alerta.simbolo,
-            alerta.detalle,
-        )
+            logger.info(
+                "ALERTA [%s] %s · %s — %s",
+                alerta.severidad,
+                alerta.titulo,
+                alerta.simbolo,
+                alerta.detalle,
+            )
 
     def _encolar(self, alerta: Alerta) -> None:
         """Mete la alerta en la cola de escritura y despierta al despachador."""

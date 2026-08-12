@@ -139,7 +139,27 @@ antes de levantarla. Dos decisiones a no deshacer: (a) **las pruebas definen sus
 (en `conftest.py`) y no usan los de `humo.py`, que se borra en el 3.2; (b)
 `test_todos_los_detectores_de_verdad_cumplen_las_reglas` recorre la carpeta **sin nombrar a nadie** y
 verifica los invariantes, así que cubre gratis a cada detector futuro. Correr: `cd backend && uv run pytest`.
-**Siguiente: 3.2 (alerta #1, umbral de precio: el primer detector real).**
+**3.2 HECHO (alerta #1, umbral de precio — el primer detector real)**: `detectores/umbral_precio.py`
++ `detectores/umbrales.py` (la configuración: copia en memoria + tabla `sql/004_umbrales.sql`) +
+`GET/POST/DELETE /umbrales`. **`detectores/humo.py` BORRADO**. **La idea central: cruzar no es estar.**
+`if precio > umbral` sigue siendo verdad mientras el precio se quede arriba → avisaría en bucle; lo que
+se detecta es la TRANSICIÓN. Para eso el detector recuerda **de qué lado vio el precio la última vez**
+— la única memoria que se permite, y no rompe la reproducibilidad (misma secuencia de ticks → mismas
+alertas). **Recién despierto NO inventa un cruce**: si Argos arranca con el precio ya del otro lado,
+anota el lado y se calla; encontrarlo cruzado no es haberlo visto cruzar (verificado en vivo). **La
+línea pertenece al lado de abajo**, para que "sube de 70.000" (avisa a 70.000,01) y "baja de 3.400"
+(avisa al tocar 3.400) digan las dos la verdad. Contra el precio que baila sobre la línea actúa el
+silencio del motor, no una histéresis: medido en vivo, **11 cruces reales silenciados**. Los umbrales
+se recargan de la tabla **cada 60 s** además de al crearlos por la API, porque si la base está caída al
+arrancar el detector vigilaría nada y eso no se nota solo (`cargado_alguna_vez` lo distingue de "no hay
+umbrales"). **Dos bugs cazados**: (a) el lado visto se actualizaba DENTRO del bucle → con dos umbrales
+sobre el mismo número el segundo nunca veía el cruce (lo encontró una prueba; ahora son 3 fases:
+calcular lados → emitir → recordar); (b) "cruzó 63834 (venía de 63834)" — cierto pero ilegible, y
+frecuente porque los umbrales van en números redondos.
+**3.2b HECHO (corrección al 3.1)**: `Detector.evaluar()` devuelve **`list[Alerta]`**, ya no
+`Alerta | None`. Con umbrales en 70.000 y 71.000, un tick de 69.900 a 71.200 cruza los dos y el segundo
+quedaba marcado como visto sin haber avisado nunca. Se cambió con 2 detectores en el repo y no con 5.
+**Siguiente: 3.3 (alerta #2, movimiento % en ventana — el primero `POR_VELA_CERRADA`).**
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.

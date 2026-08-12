@@ -11,8 +11,11 @@ Mercado:
     WS   /ws/mercado      → el backend EMPUJA los precios en vivo                 (paso 1.4)
 
 Alertas:
-    GET  /detectores      → qué vigila Argos y con qué cadencia                   (paso 3.1)
-    GET  /alertas         → lo que Argos vio, de lo más nuevo a lo más viejo      (paso 3.1)
+    GET    /detectores    → qué vigila Argos y con qué cadencia                   (paso 3.1)
+    GET    /alertas       → lo que Argos vio, de lo más nuevo a lo más viejo      (paso 3.1)
+    GET    /umbrales      → los precios que pediste vigilar                       (paso 3.2)
+    POST   /umbrales      → agregar uno                                           (paso 3.2)
+    DELETE /umbrales/{id} → sacar uno                                             (paso 3.2)
 
 Desde el paso 1.2, al arrancar la API se encienden tareas de fondo que corren para siempre:
 escuchar Binance, guardar en TimescaleDB, difundir a los paneles conectados (1.4) y, desde
@@ -24,16 +27,19 @@ import logging
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from datetime import datetime
+from decimal import Decimal
 from typing import Literal
 
-from fastapi import FastAPI, HTTPException, Query, WebSocket, WebSocketDisconnect
+from fastapi import Body, FastAPI, HTTPException, Path, Query, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
+from pydantic import BaseModel, Field
 
 from app.config import obtener_settings
 from app.db import abrir_pool, cerrar_pool, revisar_conexion
 from app.detectores import almacen as almacen_de_alertas
 from app.detectores import registro as registro_de_detectores
+from app.detectores import umbrales as config_umbrales
 from app.detectores.motor import MotorDeDetectores
 from app.difusion import GestorDeConexiones, emitir_estado
 from app.esquema import aplicar_esquema
@@ -118,6 +124,12 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         tareas.append(
             asyncio.create_task(motor_de_alertas.despachar(), name="detectores-despacho")
         )
+        # Trae los umbrales configurados a memoria y los mantiene al día. Es una tarea
+        # aparte porque tiene que sobrevivir a que la base esté caída al arrancar: si
+        # no se cargan, la alerta de umbral no vigila nada y eso no se nota solo.
+        tareas.append(
+            asyncio.create_task(config_umbrales.mantener_al_dia(), name="umbrales-recarga")
+        )
     else:
         logger.info("Detección desactivada (DETECCION_ACTIVA=false)")
 
@@ -171,7 +183,8 @@ app.add_middleware(
         "http://localhost:5173",
         "http://127.0.0.1:5173",
     ],
-    allow_methods=["GET"],
+    # POST y DELETE desde el paso 3.2: el panel tiene que poder crear y borrar umbrales.
+    allow_methods=["GET", "POST", "DELETE"],
     allow_headers=["*"],
 )
 
@@ -446,6 +459,115 @@ async def listar_alertas(
             "alertas": [almacen_de_alertas.alerta_a_json(alerta) for alerta in alertas],
         }
     )
+
+
+class UmbralNuevo(BaseModel):
+    """El cuerpo de `POST /umbrales`."""
+
+    simbolo: str = Field(description="Par a vigilar. Ej: BTCUSDT.")
+    valor: Decimal = Field(gt=0, description="El precio que marca la línea.")
+    direccion: Literal["arriba", "abajo"] = Field(
+        description="`arriba` = avisar al cruzar subiendo; `abajo`, bajando."
+    )
+    nota: str | None = Field(
+        default=None, max_length=200, description="Para qué lo pusiste, en tus palabras."
+    )
+
+
+@app.get("/umbrales")
+def listar_umbrales() -> dict[str, object]:
+    """Los precios que pediste vigilar (paso 3.2).
+
+    Se responde **desde memoria**, que es la misma copia que mira el detector con cada
+    operación: si algo aparece acá, está siendo vigilado de verdad.
+
+    Mirá `cargado_alguna_vez`: si es `false`, Argos todavía no pudo leer la tabla (la
+    base estaba caída al arrancar) y la lista vacía **no significa que no haya
+    umbrales**, significa que no sabemos. Se reintenta cada minuto.
+    """
+    catalogo = config_umbrales.CATALOGO
+
+    return {
+        "umbrales": [config_umbrales.umbral_a_json(u) for u in catalogo.todos()],
+        **catalogo.resumen(),
+    }
+
+
+@app.post("/umbrales", status_code=201)
+async def crear_umbral(nuevo: UmbralNuevo = Body()) -> dict[str, object]:
+    """Agrega un umbral. Empieza a vigilarse en la operación siguiente (paso 3.2).
+
+    **Ojo con lo que NO hace:** si el precio ya está del otro lado de la línea cuando lo
+    creás, no vas a recibir un aviso inmediato. El detector avisa cuando ve **cruzar**, y
+    encontrar el precio ya cruzado no es haberlo visto cruzar. Vas a recibir el aviso la
+    próxima vez que la cruce de verdad.
+    """
+    if nuevo.simbolo not in SIMBOLOS_MVP:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "simbolo_no_vigilado",
+                "detalle": f"Argos todavía no vigila '{nuevo.simbolo}'.",
+                "disponibles": list(SIMBOLOS_MVP),
+            },
+        )
+
+    catalogo = config_umbrales.CATALOGO
+    if not config_umbrales.sin_duplicado(
+        catalogo.todos(), nuevo.simbolo, nuevo.valor, nuevo.direccion
+    ):
+        raise HTTPException(
+            status_code=409,
+            detail={
+                "status": "umbral_repetido",
+                "detalle": (
+                    f"Ya hay un umbral de {nuevo.simbolo} en {nuevo.valor} "
+                    f"hacia {nuevo.direccion}."
+                ),
+            },
+        )
+
+    try:
+        umbral = await config_umbrales.crear(
+            nuevo.simbolo, nuevo.valor, nuevo.direccion, nuevo.nota
+        )
+    except ValueError as error:
+        raise HTTPException(status_code=400, detail={"detalle": str(error)}) from error
+    except Exception as error:
+        logger.warning("No se pudo crear el umbral: %s", error)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "sin_conexion",
+                "detalle": str(error),
+                "pista": "¿Está levantada la base? Probá GET /health/db",
+            },
+        ) from error
+
+    return config_umbrales.umbral_a_json(umbral)
+
+
+@app.delete("/umbrales/{id_umbral}", status_code=204)
+async def borrar_umbral(id_umbral: int = Path(ge=1)) -> None:
+    """Deja de vigilar un precio (paso 3.2)."""
+    try:
+        existia = await config_umbrales.borrar(id_umbral)
+    except Exception as error:
+        logger.warning("No se pudo borrar el umbral %d: %s", id_umbral, error)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "sin_conexion",
+                "detalle": str(error),
+                "pista": "¿Está levantada la base? Probá GET /health/db",
+            },
+        ) from error
+
+    if not existia:
+        raise HTTPException(
+            status_code=404,
+            detail={"status": "no_existe", "detalle": f"No hay ningún umbral con id {id_umbral}."},
+        )
 
 
 @app.websocket("/ws/mercado")

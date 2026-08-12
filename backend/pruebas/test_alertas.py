@@ -19,7 +19,7 @@ from .conftest import (
 
 
 def test_la_clave_junta_detector_y_simbolo():
-    alerta = DetectorQueSiempreEmite().evaluar(hacer_contexto(tick=hacer_tick()))
+    alerta = DetectorQueSiempreEmite().evaluar(hacer_contexto(tick=hacer_tick()))[0]
 
     assert alerta.clave == "prueba_siempre:BTCUSDT"
 
@@ -28,8 +28,8 @@ def test_el_mismo_detector_en_otro_simbolo_es_otra_clave():
     """Que BTC esté raro no tiene por qué silenciar lo que pase con ETH."""
     detector = DetectorQueSiempreEmite()
 
-    btc = detector.evaluar(hacer_contexto(tick=hacer_tick(), simbolo="BTCUSDT"))
-    eth = detector.evaluar(hacer_contexto(tick=hacer_tick(), simbolo="ETHUSDT"))
+    btc = detector.evaluar(hacer_contexto(tick=hacer_tick(), simbolo="BTCUSDT"))[0]
+    eth = detector.evaluar(hacer_contexto(tick=hacer_tick(), simbolo="ETHUSDT"))[0]
 
     assert btc.clave != eth.clave
 
@@ -63,7 +63,7 @@ def test_la_alerta_viaja_con_los_numeros_que_la_justifican():
         velas=(hacer_vela("101"), hacer_vela("102"), hacer_vela("103"))
     )
 
-    alerta = detector.evaluar(contexto)
+    alerta = detector.evaluar(contexto)[0]
 
     assert alerta.evidencia["cierre"] == "103"
     assert alerta.evidencia["velas_cerradas"] == "3"
@@ -77,14 +77,14 @@ def test_la_evidencia_va_toda_como_texto():
         velas=(hacer_vela("101"), hacer_vela("102"), hacer_vela("103"))
     )
 
-    alerta = detector.evaluar(contexto)
+    alerta = detector.evaluar(contexto)[0]
 
     assert all(isinstance(valor, str) for valor in alerta.evidencia.values())
 
 
 def test_una_alerta_no_se_puede_editar_despues():
     """Una alerta es un hecho: se emitió en un momento, con unos números."""
-    alerta = DetectorQueSiempreEmite().evaluar(hacer_contexto(tick=hacer_tick()))
+    alerta = DetectorQueSiempreEmite().evaluar(hacer_contexto(tick=hacer_tick()))[0]
 
     with pytest.raises(AttributeError):
         alerta.detalle = "otra cosa"  # type: ignore[misc]
@@ -92,7 +92,7 @@ def test_una_alerta_no_se_puede_editar_despues():
 
 def test_la_alerta_recien_emitida_todavia_no_tiene_id():
     """El id lo pone la base al guardarla; antes de eso, decir un número sería inventarlo."""
-    alerta = DetectorQueSiempreEmite().evaluar(hacer_contexto(tick=hacer_tick()))
+    alerta = DetectorQueSiempreEmite().evaluar(hacer_contexto(tick=hacer_tick()))[0]
 
     assert alerta.id is None
 
@@ -127,7 +127,7 @@ def test_las_tres_severidades_validas_pasan(severidad):
 
 
 def test_la_alerta_sabe_de_que_detector_salio():
-    alerta = DetectorQueSiempreEmite().evaluar(hacer_contexto(tick=hacer_tick()))
+    alerta = DetectorQueSiempreEmite().evaluar(hacer_contexto(tick=hacer_tick()))[0]
 
     assert alerta.detector == "prueba_siempre"
     assert alerta.titulo == "Prueba · siempre"

@@ -39,7 +39,7 @@ def detector_de_mentira(**atributos) -> type[Detector]:
         "titulo": "Prueba",
         "descripcion": "Detector de mentira.",
         "cadencia": Cadencia.POR_TICK,
-        "evaluar": lambda self, contexto: None,
+        "evaluar": lambda self, contexto: [],
     }
     return type("DetectorDeMentira", (Detector,), base | atributos)
 
@@ -142,9 +142,10 @@ def test_crear_con_un_nombre_inventado_avisa():
 def test_todos_los_detectores_de_verdad_cumplen_las_reglas():
     """Recorre lo que haya en `app/detectores/` y verifica los invariantes.
 
-    Esta prueba no nombra ningún detector concreto a propósito: los de hoy son andamios
-    que se borran en el 3.2, y los reales llegan en los pasos siguientes. Escrita así,
-    cubre gratis a cada detector que se escriba de acá en adelante.
+    Esta prueba no nombra ningún detector concreto a propósito, y ya demostró que valía
+    la pena: se escribió cuando los únicos detectores eran los andamios del 3.1, los
+    andamios se borraron en el 3.2 y la prueba siguió andando tal cual, cubriendo al
+    detector nuevo sin que nadie la tocara. Cubre gratis a los que falten (3.3 a 3.5).
     """
     registro.descubrir()
     catalogo = registro.catalogo()
@@ -193,9 +194,18 @@ def test_no_se_puede_instanciar_un_detector_sin_evaluar():
         DetectorIncompleto()  # type: ignore[abstract]
 
 
-def test_evaluar_devuelve_alerta_o_none_y_nada_mas():
-    """El contrato de `evaluar`, escrito como prueba."""
+def test_evaluar_devuelve_una_lista_de_alertas():
+    """El contrato de `evaluar`, escrito como prueba.
+
+    Devuelve una LISTA desde el 3.2: un detector puede encontrar varias cosas en la
+    misma evaluación (dos umbrales cruzados por el mismo tick), y con un solo retorno
+    la segunda se perdía en silencio.
+    """
     contexto = hacer_contexto(tick=hacer_tick())
 
-    assert isinstance(DetectorQueSiempreEmite().evaluar(contexto), Alerta)
-    assert DetectorQueNuncaEmite().evaluar(contexto) is None
+    encontradas = DetectorQueSiempreEmite().evaluar(contexto)
+    assert isinstance(encontradas, list)
+    assert all(isinstance(a, Alerta) for a in encontradas)
+
+    # La lista vacía es la respuesta normal, y NO es `None`.
+    assert DetectorQueNuncaEmite().evaluar(contexto) == []

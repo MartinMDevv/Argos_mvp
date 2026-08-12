@@ -131,4 +131,4 @@ def test_la_alerta_hereda_el_momento_del_contexto():
         velas=(hacer_vela("101"), hacer_vela("102"), hacer_vela("103"))
     )
 
-    assert detector.evaluar(contexto).momento == MOMENTO
+    assert detector.evaluar(contexto)[0].momento == MOMENTO

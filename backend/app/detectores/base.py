@@ -163,11 +163,18 @@ class Detector(ABC):
     minutos. Lo aplica el motor, no el detector (ver `silencio.py`)."""
 
     @abstractmethod
-    def evaluar(self, contexto: ContextoDeEvaluacion) -> Alerta | None:
-        """Mira el contexto y devuelve una alerta, o `None` si no hay nada que contar.
+    def evaluar(self, contexto: ContextoDeEvaluacion) -> list[Alerta]:
+        """Mira el contexto y devuelve las alertas que encontró. Vacía si no hay nada.
 
-        `None` es la respuesta normal. Un detector que casi siempre encuentra algo no
-        está detectando: está describiendo.
+        **La lista vacía es la respuesta normal.** Un detector que casi siempre
+        encuentra algo no está detectando: está describiendo.
+
+        ## Por qué una lista y no `Alerta | None`
+        Empezó devolviendo una sola (paso 3.1) y se cambió al escribir el primer
+        detector de verdad (3.2). El caso que lo rompía: con umbrales en 70.000 y
+        71.000, un tick que salta de 69.900 a 71.200 cruza los dos. Devolviendo una
+        sola, el segundo cruce quedaba marcado como visto sin haberse avisado nunca —
+        una alerta perdida en silencio, que es el peor modo de falla de Argos.
 
         No hagas E/S acá dentro (ni base de datos, ni red): ver el encabezado del
         módulo. Y usá `contexto.momento`, nunca `datetime.now()`.

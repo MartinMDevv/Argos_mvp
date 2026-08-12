@@ -116,7 +116,29 @@ TimescaleDB → velas → empujado al panel.
   detectores** en vez de usar los de `humo.py`, para que no se rompan cuando lo borremos. Y
   `test_todos_los_detectores_de_verdad_cumplen_las_reglas` recorre la carpeta sin nombrar a nadie:
   cubre gratis a los cuatro detectores del MVP que todavía no existen.)*
-- [ ] **3.2** Alerta #1 Umbral de precio
+- [x] **3.2** Alerta #1 Umbral de precio ✅
+  *(`app/detectores/umbral_precio.py` + `umbrales.py` (configuración: memoria + tabla) +
+  `sql/004_umbrales.sql` + `GET/POST/DELETE /umbrales`. **`humo.py` borrado**: los andamios
+  cumplieron. **La idea central: cruzar no es estar.** La versión ingenua (`if precio > umbral`)
+  sigue siendo verdadera mientras el precio se quede arriba, así que avisaría una y otra vez de lo
+  mismo; lo que se detecta es la **transición**, y para eso el detector recuerda de qué lado vio el
+  precio la última vez (la única memoria que se permite, y sigue siendo reproducible: misma
+  secuencia → mismas alertas). **Recién despierto no inventa un cruce**: si Argos arranca y el
+  precio ya está del otro lado, anota el lado y se calla — encontrarlo cruzado no es haberlo visto
+  cruzar. La línea pertenece al lado de abajo, para que "sube de 70.000" y "baja de 3.400" digan
+  las dos la verdad. **Dos bugs encontrados y arreglados**: (a) el lado visto se actualizaba dentro
+  del bucle, así que con dos umbrales sobre el mismo número el segundo nunca veía el cruce — lo
+  cazó una prueba; (b) el mensaje decía "cruzó 63834 (venía de 63834)", cierto pero ilegible, y
+  pasa seguido porque los umbrales se ponen en números redondos. **Verificado en vivo**: cruces
+  reales en las dos direcciones, uno a valor exacto, 11 cruces silenciados por el antirruido
+  mientras el precio bailaba sobre la línea, y ninguna alerta falsa al reiniciar con el precio ya
+  cruzado.)*
+- [x] **3.2b** Corrección al framework del 3.1 (salió al escribir el primer detector real) ✅
+  *(`evaluar()` pasó de devolver `Alerta | None` a `list[Alerta]`. El caso que lo rompía: con
+  umbrales en 70.000 y 71.000, un tick que salta de 69.900 a 71.200 cruza los dos, y devolviendo
+  una sola el segundo quedaba marcado como visto **sin haber avisado nunca** — alerta perdida en
+  silencio, el peor modo de falla de Argos. Se cambió con dos detectores en el repo en vez de con
+  cinco; para eso servían los andamios.)*
 - [ ] **3.3** Alerta #2 Movimiento % en ventana
 - [ ] **3.4** Alerta #3 Volatilidad anómala (z-score) *(ya con algo de historia)*
 - [ ] **3.5** Alerta #4 Volumen anómalo
@@ -155,11 +177,11 @@ de cada una está en el [spec, §2.F](../../spec-crypto-monitor.md).
 
 ---
 
-**👉 Estamos aquí:** **Fases 0, 1 y 2 cerradas + 3.1 hecho.** El backend ve el mercado, lo guarda, lo
-resume en velas y lo empuja en vivo; el panel entero usa datos reales; y desde el 3.1 existe el enchufe
-donde van las alertas: hay un motor corriendo, un antirruido que ya se puede medir y una tabla donde
-queda registrado lo que Argos vio. Todavía no vigila nada de verdad — los dos detectores que hay son
-andamios. Siguiente: **3.2 — Umbral de precio**, el primer detector real, que además jubila `humo.py`.
+**👉 Estamos aquí:** **Fases 0, 1 y 2 cerradas + 3.1 y 3.2 hechos.** Argos ya vigila algo de verdad:
+le decís "avisame si BTC pasa de 70.000" y te avisa cuando lo cruza, una sola vez, con los números que
+lo justifican. Falta que lo encuentre solo — las tres alertas que vienen (movimiento %, volatilidad,
+volumen) son las que no dependen de que vos sepas qué número mirar. Siguiente: **3.3 — Movimiento % en
+ventana**, el primero que usa la historia (`POR_VELA_CERRADA`) en vez del tick suelto.
 
 ### Cómo levantar el frontend
 ```bash

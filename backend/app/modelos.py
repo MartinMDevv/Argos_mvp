@@ -135,6 +135,47 @@ class Vela:
         return (self.cierre - self.apertura) / self.apertura * 100
 
 
+DIRECCIONES = ("arriba", "abajo")
+"""Hacia dónde tiene que cruzar el precio para que un umbral avise."""
+
+
+@dataclass(frozen=True, slots=True)
+class Umbral:
+    """Un precio que vos elegiste vigilar. La configuración de la alerta #1 (paso 3.2).
+
+    "Avisame si BTC pasa de 70.000". Es lo único de Argos que no sale del mercado sino
+    de una decisión tuya, y por eso vive en su propia tabla y no en un archivo de
+    configuración: se crea y se borra mientras el sistema corre.
+
+    Un umbral vigila **una sola dirección**. Si querés enterarte tanto de la subida
+    como de la bajada, son dos umbrales — así cada aviso dice exactamente qué pasó, sin
+    que haya que deducirlo.
+    """
+
+    simbolo: str
+    """Par vigilado. Ej: `BTCUSDT`."""
+
+    valor: Decimal
+    """El precio que marca la línea."""
+
+    direccion: str
+    """`arriba` = avisar cuando el precio cruza la línea subiendo; `abajo`, bajando.
+
+    **La línea pertenece al lado de abajo**: un precio exactamente igual a `valor`
+    cuenta como "abajo". Así, "avisame si sube de 70.000" avisa recién a los 70.000,01,
+    y "avisame si baja de 3.400" avisa al tocar 3.400 justo. La regla tenía que ser una
+    de las dos; esta es la que hace que ninguna de las dos frases mienta."""
+
+    nota: str | None = None
+    """Para qué lo pusiste, en tus palabras. Opcional; viaja en la alerta."""
+
+    creado: datetime | None = None
+    """Cuándo se creó, en UTC. Lo pone la base."""
+
+    id: int | None = None
+    """El identificador de la fila. `None` antes de guardarlo."""
+
+
 @dataclass(frozen=True, slots=True)
 class Alerta:
     """Algo que Argos vio y decidió contar. La salida de un detector (paso 3.1).
