@@ -83,10 +83,16 @@ def hacer_contexto(
     velas: tuple[Vela, ...] = (),
     simbolo: str = "BTCUSDT",
     intervalo: str = "1m",
+    extras: dict[str, object] | None = None,
 ) -> ContextoDeEvaluacion:
     """Lo que vería un detector en un momento dado."""
     return ContextoDeEvaluacion(
-        simbolo=simbolo, momento=MOMENTO, tick=tick, velas=velas, intervalo=intervalo
+        simbolo=simbolo,
+        momento=MOMENTO,
+        tick=tick,
+        velas=velas,
+        intervalo=intervalo,
+        extras=extras or {},
     )
 
 

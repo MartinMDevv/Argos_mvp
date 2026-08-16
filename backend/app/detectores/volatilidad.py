@@ -14,23 +14,36 @@ raro para lo que este activo viene haciendo?"**. El umbral deja de ser un númer
 a mano y pasa a salir de los datos del propio activo, que es lo que la regla de oro pide
 en todos lados.
 
-## Qué se mide: la amplitud de la vela
-`(máximo − mínimo) / apertura`, en porcentaje. Cuánto terreno recorrió el precio dentro
-del tramo, sin importar dónde terminó.
+## Qué se mide: el rango verdadero, como lo mide cualquier trader
+El **True Range** de Wilder —el que está debajo del ATR que trae cualquier plataforma—,
+expresado en porcentaje del precio. Es el mayor de estos tres:
 
-Es a propósito distinta de la #2, que mide cierre contra cierre. Un tramo que sube 3% y
-vuelve al mismo lugar tiene movimiento neto **cero** y una amplitud enorme: para la #2 no
+    máximo − mínimo          (lo que recorrió dentro del tramo)
+    |máximo − cierre previo| (el salto hacia arriba desde donde venía)
+    |mínimo − cierre previo| (el salto hacia abajo)
+
+Los dos últimos existen por los **huecos**: si el tramo anterior cerró en 100 y este abre
+en 103 y se queda quieto, `máximo − mínimo` dice que no pasó nada, y sí pasó — se movió
+tres puntos entre un tramo y el siguiente. En cripto, que opera sin cerrar nunca, los
+huecos son chicos comparados con los de una acción que abre a las nueve, pero aparecen
+justo en los momentos de poca liquidez, que son los que a esta alerta le interesan.
+
+Usar la definición estándar tiene otra ventaja que no es técnica: lo que Argos mide es lo
+mismo que mira quien opera, con el mismo nombre. Comparar contra la mediana de las
+últimas 24 h en vez de contra un promedio hace de esto un **ATR robusto**.
+
+Es a propósito distinto de la #2, que mide cierre contra cierre. Un tramo que sube 3% y
+vuelve al mismo lugar tiene movimiento neto **cero** y un rango enorme: para la #2 no
 pasó nada, y sin embargo ahí hubo pánico. Las dos preguntas son distintas y por eso hay
 dos detectores:
 
 - **#2:** ¿se fue a alguna parte? (dirección)
 - **#3 (esta):** ¿se está agitando? (dispersión)
 
-La otra opción era la desviación estándar de los retornos, que es la definición de manual
-de "volatilidad". Se eligió la amplitud porque es lo que una persona llama agitación, se
-lee directo en la evidencia (`el tramo recorrió 1,8% cuando lo normal es 0,3%`) y la IA
-de la Fase 5 la puede explicar sin traducir estadística. La de manual queda anotada por
-si algún día la evidencia pide más finura.
+La otra opción era la desviación estándar de los retornos, que es la otra definición de
+manual de volatilidad. Se prefirió el rango porque es lo que una persona llama agitación,
+se lee directo en la evidencia (`el tramo recorrió 1,8% cuando lo normal es 0,3%`) y la
+IA de la Fase 5 lo puede explicar sin traducir estadística.
 
 ## Por qué NO es un z-score clásico
 El z-score de toda la vida —`(valor − media) / desviación`— asume que los datos se
@@ -67,11 +80,11 @@ significa de verdad "esto empezó de nuevo". Es la misma memoria mínima y deriv
 datos que ya usan las otras dos: reproducible, y por lo tanto rebobinable sobre el pasado.
 """
 
-import statistics
 from datetime import timedelta
 from decimal import Decimal
 
 from app.detectores.base import Cadencia, ContextoDeEvaluacion, Detector
+from app.detectores.estadistica import z_robusto
 from app.detectores.registro import registrar
 from app.modelos import Alerta, Vela
 from app.velas import INTERVALOS
@@ -122,9 +135,6 @@ Medio punto porcentual está cerca del p97 de los tramos de BTC y del p95 de los
 lo bastante arriba como para tapar las madrugadas muertas, lo bastante abajo como para
 no censurar un movimiento real de un día tranquilo."""
 
-FACTOR_MAD = Decimal("1.4826")
-"""Lo que pone al MAD en la escala de una desviación estándar (para datos normales).
-Sin esto, los z de este detector no serían comparables con los de ningún otro lado."""
 
 
 @registrar
@@ -139,8 +149,9 @@ class VolatilidadAnomala(Detector):
     )
     cadencia = Cadencia.POR_VELA_CERRADA
     intervalo = INTERVALO
-    velas_necesarias = VELAS_DE_REFERENCIA + 1
-    """La referencia más el tramo que se está juzgando."""
+    velas_necesarias = VELAS_DE_REFERENCIA + 2
+    """La referencia, el tramo que se está juzgando, y uno más: el rango verdadero de la
+    vela más vieja de la referencia necesita el cierre de la anterior a ella."""
 
     silencio = timedelta(minutes=30)
     """Red de seguridad nada más: el antirruido real es el rearme por calma. Más largo
@@ -157,7 +168,7 @@ class VolatilidadAnomala(Detector):
         self.z_para_rearmar = z_para_rearmar
         self.amplitud_minima = amplitud_minima
         self.velas_de_referencia = velas_de_referencia
-        self.velas_necesarias = velas_de_referencia + 1
+        self.velas_necesarias = velas_de_referencia + 2
 
         # Símbolo → ¿ya avisamos de este episodio y estamos esperando que se calme?
         self._en_episodio: dict[str, bool] = {}
@@ -176,31 +187,35 @@ class VolatilidadAnomala(Detector):
         if len(cerradas) < self.velas_necesarias:
             return []
 
-        actual = cerradas[-1]
-        # La referencia excluye el tramo que se está juzgando: si entrara, el valor se
-        # estaría comparando en parte contra sí mismo.
-        referencia = cerradas[-(self.velas_de_referencia + 1) : -1]
+        # Cada rango verdadero necesita la vela anterior, así que se toma un tramo de
+        # N+2 y se recorre de a pares.
+        tramo = cerradas[-(self.velas_de_referencia + 2) :]
+        actual = tramo[-1]
 
-        amplitud = amplitud_de(actual)
+        amplitud = rango_verdadero(actual, tramo[-2])
         if amplitud is None:
             return []
 
-        medidas = [medida for vela in referencia if (medida := amplitud_de(vela)) is not None]
+        # La referencia excluye el tramo que se está juzgando: si entrara, el valor se
+        # estaría comparando en parte contra sí mismo.
+        medidas = [
+            medida
+            for indice in range(1, len(tramo) - 1)
+            if (medida := rango_verdadero(tramo[indice], tramo[indice - 1])) is not None
+        ]
         if len(medidas) < self.velas_de_referencia:
             # Alguna vela de la referencia no se pudo medir (apertura en cero). No se
             # rellena el hueco con nada: se espera al próximo tramo.
             return []
 
-        centro = Decimal(statistics.median(medidas))
-        dispersion = Decimal(statistics.median([abs(m - centro) for m in medidas])) * FACTOR_MAD
-
-        if dispersion <= 0:
-            # Más de la mitad de las 24 h tuvieron exactamente la misma amplitud: no hay
-            # variación con la cual comparar. Pasa con datos raros o mercados congelados,
-            # y dividir acá sería fabricar un infinito.
+        # Devuelve `None` cuando más de la mitad de las 24 h tuvieron exactamente el mismo
+        # rango: sin dispersión no hay "raro" que valga, y dividir sería fabricar un
+        # infinito. Ver `estadistica.py`.
+        medicion = z_robusto(amplitud, medidas)
+        if medicion is None:
             return []
 
-        z = (amplitud - centro) / dispersion
+        z, centro, dispersion = medicion
 
         # ¿Se calmó? Entonces se rearma y el próximo pico vuelve a ser noticia.
         if z < self.z_para_rearmar:
@@ -237,7 +252,7 @@ class VolatilidadAnomala(Detector):
         detalle += f". Rareza: {texto(z)} desviaciones."
 
         evidencia = {
-            "amplitud_pct": texto(amplitud),
+            "rango_verdadero_pct": texto(amplitud),
             "mediana_24h_pct": texto(centro),
             "dispersion_robusta_pct": texto(dispersion),
             "z": texto(z),
@@ -274,15 +289,28 @@ class VolatilidadAnomala(Detector):
         return int(INTERVALOS[self.intervalo].total_seconds() // 60)
 
 
-def amplitud_de(vela: Vela) -> Decimal | None:
-    """Cuánto terreno recorrió el precio dentro de la vela, en % de su apertura.
+def rango_verdadero(vela: Vela, previa: Vela | None = None) -> Decimal | None:
+    """El True Range de Wilder, en % del precio de apertura.
 
-    `None` si no se puede calcular. Con apertura en cero no hay porcentaje posible, y
+    El mayor de tres distancias: lo que recorrió dentro del tramo, y los dos saltos
+    contra el cierre anterior. Sin `previa` se queda con la primera, que es la definición
+    de rango a secas — sirve para medir una vela suelta, pero se pierde el hueco.
+
+    `None` si no se puede calcular: con apertura en cero no hay porcentaje posible, y
     devolver un cero disfrazaría un dato que falta como si fuera un dato tranquilo.
     """
     if vela.apertura <= 0:
         return None
-    return (vela.maximo - vela.minimo) / vela.apertura * 100
+
+    recorrido = vela.maximo - vela.minimo
+    if previa is not None:
+        recorrido = max(
+            recorrido,
+            abs(vela.maximo - previa.cierre),
+            abs(vela.minimo - previa.cierre),
+        )
+
+    return recorrido / vela.apertura * 100
 
 
 def texto(valor: Decimal) -> str:

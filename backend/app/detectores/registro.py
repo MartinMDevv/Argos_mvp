@@ -44,7 +44,9 @@ logger = logging.getLogger(__name__)
 
 _CATALOGO: dict[str, type[Detector]] = {}
 
-INFRAESTRUCTURA = frozenset({"base", "registro", "motor", "silencio", "almacen"})
+INFRAESTRUCTURA = frozenset(
+    {"base", "registro", "motor", "silencio", "almacen", "estadistica"}
+)
 """Módulos de esta carpeta que son la maquinaria, no detectores. `descubrir()` los
 saltea: ya están importados y no tienen nada que registrar."""
 

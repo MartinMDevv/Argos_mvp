@@ -33,7 +33,7 @@ por las mismas razones.
 import asyncio
 import logging
 from collections import defaultdict, deque
-from collections.abc import Sequence
+from collections.abc import Callable, Sequence
 from datetime import UTC, datetime
 
 from app.detectores import almacen
@@ -77,10 +77,21 @@ class MotorDeDetectores:
         estado: EstadoMercado,
         detectores: Sequence[Detector],
         simbolos: Sequence[str],
+        extras: Callable[[str, str], dict[str, object]] | None = None,
     ) -> None:
         self.estado = estado
         self.simbolos = list(simbolos)
         self.detectores = list(detectores)
+
+        # Datos que un detector necesita y no salen de las velas. Los carga quien arma el
+        # motor (`main.py`) y el motor los reparte en `contexto.extras`, que es el camino
+        # que dejó previsto el paso 3.1: si hace falta una fuente nueva, la trae el motor
+        # y no el detector, que tiene que seguir siendo puro para poder rebobinarse.
+        #
+        # Es una función y no un diccionario porque el dato cambia mientras Argos corre
+        # (el perfil de volumen de la #4 se recalcula cada hora): guardar el valor acá lo
+        # dejaría congelado en el momento del arranque.
+        self._extras = extras
 
         # Los separamos una sola vez, acá, en vez de filtrar en cada vuelta del bucle.
         self._por_tick = [d for d in self.detectores if d.cadencia is Cadencia.POR_TICK]
@@ -178,6 +189,7 @@ class MotorDeDetectores:
             tick=self.estado.ultimo(simbolo),
             velas=tuple(velas),
             intervalo=intervalo,
+            extras=self._extras(simbolo, intervalo) if self._extras else {},
         )
 
         ultima = contexto.ultima_cerrada

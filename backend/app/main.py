@@ -45,6 +45,7 @@ from app.detectores import almacen as almacen_de_alertas
 from app.detectores import registro as registro_de_detectores
 from app.detectores import umbrales as config_umbrales
 from app.detectores.motor import MotorDeDetectores
+from app.detectores.volumen import CLAVE_PERFIL
 from app.difusion import GestorDeConexiones, emitir_estado
 from app.esquema import aplicar_esquema
 from app.estado import EstadoMercado
@@ -52,6 +53,7 @@ from app.ingesta.almacen import EscritorDeTicks
 from app.ingesta.backfill import ponerse_al_dia
 from app.ingesta.binance import SIMBOLOS_MVP, escuchar_ticks
 from app.modelos import Tick
+from app import perfiles
 from app.resumen import PLAZOS, obtener_resumen, resumen_a_json
 from app.velas import LIMITE_MAXIMO, obtener_velas, vela_a_json
 
@@ -68,10 +70,25 @@ gestor_de_paneles = GestorDeConexiones()
 # está mal definido, revienta acá — al arrancar, con un mensaje claro — y no a las tres
 # de la mañana dejando de emitir una alerta en silencio.
 registro_de_detectores.descubrir()
+def _extras_del_contexto(simbolo: str, intervalo: str) -> dict[str, object]:
+    """Datos que un detector necesita y no salen de las velas (paso 3.5).
+
+    Acá se junta lo que el motor le va a repartir a los detectores en `contexto.extras`.
+    Es este archivo el que lo hace —y no el motor ni el detector— porque es el único que
+    tiene por qué conocer a los dos: el motor sigue siendo genérico y el detector sigue
+    siendo puro, que es lo que le permite rebobinarse sobre el pasado.
+
+    Se lee en cada evaluación a propósito: el perfil se recalcula cada hora y guardarlo
+    una sola vez lo dejaría clavado en el del arranque.
+    """
+    return {CLAVE_PERFIL: perfiles.CATALOGO.de(simbolo)}
+
+
 motor_de_alertas = MotorDeDetectores(
     estado=estado_mercado,
     detectores=registro_de_detectores.crear(),
     simbolos=SIMBOLOS_MVP,
+    extras=_extras_del_contexto,
 )
 
 
@@ -148,6 +165,15 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         # no se cargan, la alerta de umbral no vigila nada y eso no se nota solo.
         tareas.append(
             asyncio.create_task(config_umbrales.mantener_al_dia(), name="umbrales-recarga")
+        )
+        # El perfil intradía de volumen que necesita la alerta #4: cuánto se opera
+        # normalmente a cada hora del día. Tarea aparte por lo mismo que los umbrales —
+        # si la base está caída al arrancar, un cálculo único dejaría a esa alerta sin
+        # poder opinar el resto de la sesión, y eso no se nota desde afuera.
+        tareas.append(
+            asyncio.create_task(
+                perfiles.mantener_al_dia(list(SIMBOLOS_MVP)), name="perfil-volumen"
+            )
         )
     else:
         logger.info("Detección desactivada (DETECCION_ACTIVA=false)")

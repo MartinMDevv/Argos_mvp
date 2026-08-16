@@ -15,25 +15,32 @@ from decimal import Decimal
 
 import pytest
 
-from app.detectores.volatilidad import VolatilidadAnomala, amplitud_de
+from app.detectores.volatilidad import VolatilidadAnomala, rango_verdadero
 from app.modelos import Vela
 
 from .conftest import MOMENTO, hacer_contexto
 
 CALMA = ("0.2", "0.3", "0.25", "0.35", "0.2", "0.3", "0.25", "0.35", "0.2", "0.3")
-"""Diez tramos tranquilos con algo de variación: mediana 0,275% y un MAD que no es cero.
-Sin variación el detector se calla a propósito (no hay con qué comparar)."""
+"""Diez tramos tranquilos con algo de variación. El primero se gasta como "la anterior"
+del rango verdadero, así que los nueve que quedan son la referencia: mediana 0,30% y un
+MAD que no es cero. Sin variación el detector se calla a propósito (no hay con qué
+comparar)."""
 
 
-def vela(amplitud: str, minuto: int = 0, completa: bool = True) -> Vela:
-    """Una vela de apertura 100 cuyo recorrido máximo-mínimo es el % pedido."""
+def vela(amplitud: str, minuto: int = 0, completa: bool = True, cierre: str = "100") -> Vela:
+    """Una vela que abre y cierra en 100 y sube el % pedido en el medio.
+
+    Cierra donde abrió a propósito: así el rango verdadero es exactamente el recorrido
+    pedido, sin que el hueco contra el cierre anterior meta la cola en las cuentas. Para
+    probar el hueco está `cierre`, que mueve el cierre a donde se quiera.
+    """
     recorrido = Decimal(amplitud)
     return Vela(
         inicio=MOMENTO + timedelta(minutes=5 * minuto),
         apertura=Decimal(100),
         maximo=Decimal(100) + recorrido,
         minimo=Decimal(100),
-        cierre=Decimal(100) + recorrido,
+        cierre=Decimal(cierre),
         volumen=Decimal(5),
         volumen_cotizado=Decimal(500),
         operaciones=42,
@@ -47,8 +54,12 @@ def serie(*amplitudes: str) -> tuple[Vela, ...]:
 
 
 def detector(**extra) -> VolatilidadAnomala:
-    """Un detector con referencia de 10 tramos, para que las series se puedan leer."""
-    opciones = {"velas_de_referencia": 10} | extra
+    """Un detector con referencia de 9 tramos, para que las series se puedan leer.
+
+    Nueve y no diez porque la primera vela de la serie se gasta como "la anterior" del
+    rango verdadero: con `CALMA` (diez tramos) más el que se juzga, salen justo 9+2.
+    """
+    opciones = {"velas_de_referencia": 9} | extra
     return VolatilidadAnomala(**opciones)
 
 
@@ -66,7 +77,7 @@ def test_avisa_cuando_el_tramo_se_sale_de_lo_normal():
 
     assert len(alertas) == 1
     assert "se agitó 3.00%" in alertas[0].detalle
-    assert "0.28%" in alertas[0].detalle  # la mediana de la referencia
+    assert "0.30%" in alertas[0].detalle  # la mediana de la referencia
     assert Decimal(alertas[0].evidencia["z"]) >= 5
 
 
@@ -84,9 +95,28 @@ def test_la_referencia_excluye_al_tramo_que_se_esta_juzgando():
     """Si el pico entrara en su propia referencia, se estaría comparando contra sí mismo."""
     alerta = mirar(detector(), serie(*CALMA, "3"))[0]
 
-    assert alerta.evidencia["muestras"] == "10"
-    # La mediana es la de los diez tramos tranquilos: el 3% no la movió.
-    assert alerta.evidencia["mediana_24h_pct"] == "0.28"
+    assert alerta.evidencia["muestras"] == "9"
+    # La mediana es la de los tramos tranquilos: el 3% no la movió.
+    assert alerta.evidencia["mediana_24h_pct"] == "0.30"
+
+
+def test_el_hueco_entre_tramos_tambien_es_volatilidad():
+    """Para eso se usa el rango verdadero y no el simple máximo-mínimo.
+
+    Un tramo que abre lejos de donde cerró el anterior y después se queda quieto no
+    recorrió nada por dentro, y sin embargo el precio se movió. El salto cuenta.
+    """
+    quieta = vela("0.1", minuto=10)  # apenas se mueve dentro del tramo
+    con_hueco = vela("0.1", minuto=10, cierre="100")
+
+    # La anterior cerró 3 puntos más abajo: hay un salto de ~3% entre tramos.
+    previa_lejana = vela("0.2", minuto=9, cierre="97")
+
+    # Sin la anterior: solo lo que recorrió por dentro, y parece un tramo muerto.
+    assert rango_verdadero(quieta) == Decimal("0.1")
+    # Con la anterior: del cierre de 97 al máximo de 100,1 hay 3,1 puntos de recorrido
+    # real, treinta veces más de lo que decía el máximo-mínimo.
+    assert rango_verdadero(con_hueco, previa_lejana) == Decimal("3.1")
 
 
 # -- Los bordes donde un z-score clásico se rompe -------------------------------
@@ -135,7 +165,7 @@ def test_sin_dispersion_no_se_inventa_un_infinito():
 
 
 def test_una_apertura_en_cero_no_revienta():
-    assert amplitud_de(vela("1")) == Decimal(1)
+    assert rango_verdadero(vela("1")) == Decimal(1)
     rota = Vela(
         inicio=MOMENTO,
         apertura=Decimal(0),
@@ -148,7 +178,7 @@ def test_una_apertura_en_cero_no_revienta():
         fuente="propia",
         completa=True,
     )
-    assert amplitud_de(rota) is None
+    assert rango_verdadero(rota) is None
     assert mirar(detector(), serie(*CALMA) + (rota,)) == []
 
 

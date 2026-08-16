@@ -195,7 +195,39 @@ TimescaleDB → velas → empujado al panel.
   umbrales era la equivocada. Quedó en **z 25** (rearme 8 ≈ p99, `fuerte` 50, piso 0,5%) →
   **BTC 1,9 alertas/mes, ETH 2,4/mes**, y el desplome del 10-oct-2025 produce **una** alerta, no una
   ráfaga. 119 pruebas, sin Docker ni internet.)*
-- [ ] **3.5** Alerta #4 Volumen anómalo
+- [x] **3.5** Alerta #4 Volumen anómalo ✅
+  *(`app/detectores/volumen.py` + `app/perfiles.py`. La única de las cuatro que puede avisar **antes**
+  de que el precio se mueva: las otras reaccionan al precio, y el volumen es lo que se mueve primero
+  cuando alguien grande entra o sale. Por eso la alerta cuenta además qué hizo el precio — volumen
+  alto **con** movimiento confirma lo que ya se ve; volumen alto **sin** movimiento es la señal
+  interesante.
+  **El problema propio de este detector es el reloj.** El volumen de cripto tiene horario: medido
+  sobre la base, la franja de las 14:00 UTC (apertura de EEUU) mueve **2,8× la de las 21:00**, todos
+  los días. Comparar contra "la mediana de las últimas 24 h" no detecta anomalías, detecta el
+  amanecer de Nueva York — se comprobó: **una cuarta parte de las alertas caía en 3 horas del día**.
+  La solución es la que usa cualquier operador: **RVOL**, el volumen de ahora dividido por el típico
+  de **esta misma franja horaria** en los últimos 14 días. Con el perfil intradía la concentración
+  bajó de 25% a **14-15%** (lo uniforme sería 12,5%), o sea que el efecto del reloj desapareció.
+  El perfil lo arma `app/perfiles.py` (una consulta, 288 franjas, recalculado cada hora) y **se lo
+  pasa el motor al detector en `contexto.extras`**, que es el camino que dejó previsto el 3.1: si
+  hace falta una fuente nueva la carga el motor, nunca el detector, que tiene que seguir siendo puro
+  para poder rebobinarse. Para eso el motor tomó un parámetro `extras` y `main.py` es quien conecta
+  los dos — el motor sigue sin conocer ningún detector concreto.
+  **Calibración con historia real, con el perfil móvil de los 14 días previos a cada día** (usar el
+  año entero metería el futuro en la referencia y el backtest sería mentira): el RVOL de 2-3 del que
+  se habla en el ambiente es para el acumulado del día, no para tramos de 5 minutos — con 5 daban
+  **165 alertas al mes**. Quedó en **RVOL 30** (rearme 2, `fuerte` 60) → **BTC 3,9/mes, ETH 5,3/mes**.
+  El piso en dólares no cambia nada con BTC/ETH (mismas alertas con 500 mil que con 5 millones):
+  queda como seguro para cuando Argos mire activos más chicos. 134 pruebas.)*
+- [x] **3.5b** La #3 pasa a medir como el resto del mundo *(salió de revisar el estándar)* ✅
+  *(La alerta #3 medía `máximo − mínimo`; ahora usa el **rango verdadero** (*True Range*) de Wilder,
+  que es lo que hay debajo del ATR de cualquier plataforma: el mayor entre el recorrido interno y
+  los dos saltos contra el cierre anterior. Los huecos entre tramos son volatilidad real que la
+  medida anterior no veía — hay una prueba donde un tramo "quieto" pasa de 0,1% a 3,1% al mirarlo
+  bien. Recalibrado: los umbrales aguantan (BTC 2,0 alertas/mes, ETH 2,4) y el desplome del
+  10-oct-2025 **sube a `fuerte`**, que antes se quedaba corto. Comparar contra la mediana en vez de
+  un promedio hace de esto un ATR robusto. Además, el cálculo de mediana+MAD que comparten la #3 y
+  la #4 se mudó a `detectores/estadistica.py`, para que el "por qué robusto" esté escrito una vez.)*
 - [ ] **3.6** Panel de alertas en el dashboard + configuración de umbrales
 
 ## FASE 4 — Notificaciones
@@ -237,10 +269,14 @@ vez, con los números, y sin repetirlo mientras la ventana arrastra el mismo sal
 pone al día solo al encender, así que el gráfico y la historia contra la que comparan los detectores
 están completos desde el primer minuto.
 
-Y con el **3.4** ya tiene criterio propio: la volatilidad no se juzga contra un número que pusimos
-nosotros sino contra lo que ese activo viene haciendo, que es lo que el spec pide para que la alerta
-sirva igual en BTC que en una moneda chica. Siguiente: **3.5 — Volumen anómalo**, la última de las
-cuatro del MVP y la que, según el spec, suele *preceder* al movimiento en vez de acompañarlo.
+Y con el **3.4** y el **3.5** ya tiene criterio propio: ni la volatilidad ni el volumen se juzgan
+contra un número que pusimos nosotros, sino contra lo que ese activo viene haciendo —y, en el caso
+del volumen, contra lo que hace **a esta hora**—. **Las cuatro alertas del MVP están hechas.** Entre
+las cuatro hablan unas 10 veces al mes por símbolo, medido sobre un año de historia real.
+
+Siguiente: **3.6 — el panel de alertas**, que es lo que falta para que todo esto se vea. Hoy Argos
+detecta y guarda, pero el recuadro "LO QUE ARGOS VIO" del panel sigue siendo maqueta: hay que
+enchufarlo a `GET /alertas` y sumar la configuración de umbrales desde la interfaz.
 
 ### Cómo levantar el frontend
 ```bash

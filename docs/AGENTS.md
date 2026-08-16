@@ -194,7 +194,27 @@ la distribución real (p50≈0, p90≈2,3, p99≈7, p99,9≈15, p99,99≈34) que
 construido y la escala de umbrales era la equivocada → **z 25** (rearme 8, `fuerte` 50, piso 0,5%):
 BTC 1,9 alertas/mes, ETH 2,4/mes, y el 10-oct-2025 da UNA alerta. **Regla que confirma el 3.3: los
 umbrales de un detector se eligen rebobinando sobre la historia real, nunca a ojo.**
-**Siguiente: 3.5 (alerta #4, volumen anómalo — la última de las cuatro del MVP).**
+**3.5 HECHO (alerta #4, volumen anómalo) → LAS CUATRO ALERTAS DEL MVP ESTÁN**:
+`detectores/volumen.py` + `app/perfiles.py`. La única que puede avisar **antes** de que el precio se
+mueva, y por eso la alerta también dice qué hizo el precio (volumen alto SIN movimiento = la señal
+interesante). **El problema propio acá es el reloj**: la franja de las 14:00 UTC mueve 2,8× la de
+las 21:00 todos los días, así que comparar contra las últimas 24 h detecta el amanecer de Nueva
+York — medido, 25% de las alertas caían en 3 horas del día. Se usa **RVOL** (lo que usa cualquier
+operador): volumen de ahora ÷ volumen típico de **esta misma franja** en 14 días. Con eso la
+concentración bajó a 14-15% (lo uniforme sería 12,5%). El perfil lo arma `perfiles.py` (288 franjas,
+recalculado cada hora) y **el motor se lo pasa al detector en `contexto.extras`** — el camino
+previsto en el 3.1: el motor tomó un parámetro `extras` y `main.py` conecta los dos, así el motor
+sigue sin conocer detectores concretos y el detector sigue siendo puro. Calibrado con perfil móvil
+(los 14 días PREVIOS a cada día, o el backtest sería mentira): el RVOL 2-3 del ambiente es para el
+acumulado del día, no para tramos de 5 min — con 5 daba 165 alertas/mes → quedó en **RVOL 30**
+(rearme 2, `fuerte` 60): BTC 3,9/mes, ETH 5,3/mes.
+**3.5b HECHO (la #3 pasa al estándar)**: medía `máx − mín`, ahora usa el **rango verdadero** (True
+Range de Wilder, lo que hay debajo del ATR): captura los huecos entre tramos, que son volatilidad
+real que antes se perdía. Recalibrado, los umbrales aguantan y el 10-oct-2025 sube a `fuerte`.
+El cálculo mediana+MAD compartido por la #3 y la #4 vive ahora en `detectores/estadistica.py`
+(está en `INFRAESTRUCTURA` del registro, no es un detector).
+**Siguiente: 3.6 (panel de alertas en el dashboard + configuración de umbrales). El recuadro "LO QUE
+ARGOS VIO" del panel sigue siendo maqueta: hay que enchufarlo a `GET /alertas`.**
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.
