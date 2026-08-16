@@ -140,7 +140,39 @@ TimescaleDB → velas → empujado al panel.
   una sola el segundo quedaba marcado como visto **sin haber avisado nunca** — alerta perdida en
   silencio, el peor modo de falla de Argos. Se cambió con dos detectores en el repo en vez de con
   cinco; para eso servían los andamios.)*
-- [ ] **3.3** Alerta #2 Movimiento % en ventana
+- [x] **3.3** Alerta #2 Movimiento % en ventana ✅
+  *(`app/detectores/movimiento_porcentual.py`. El primer detector `POR_VELA_CERRADA` y el primero
+  que Argos encuentra **solo**, sin que tú tengas que saber qué número mirar. Mide **cierre contra
+  cierre** de hace N minutos: el rango máx-mín mediría agitación y eso es la #3, tener dos
+  detectores contando la misma noticia es no tener dos detectores. Tres ventanas (5/15/60 min) y se
+  emite **solo la más corta que saltó**, con la clave llevando la dirección y **no** la ventana,
+  para que las tres compartan el silencio. **La idea central, hermana del "cruzar no es estar" de
+  la #1: moverse no es haberse movido.** Un pump de 4% sigue dentro de la ventana de una hora
+  durante la hora siguiente, así que el detector ingenuo lo grita sesenta veces mientras el precio
+  ya no hace nada; por eso al emitir se anota **desde qué precio se avisó** y hacia ese mismo lado
+  no se vuelve a hablar salvo que el movimiento continúe otro tanto. La referencia se busca **por
+  marca de tiempo y no por posición** (un minuto sin operaciones correría la ventana sin avisar), y
+  si esa vela no está, no se opina: no se aproxima con la más cercana.
+  **Verificado rebobinando el detector sobre los 369 días de historia real de la base** — que es
+  el argumento de diseño del 3.1 cobrado: un detector puro se puede correr sobre el pasado. Ahí se
+  midió que la memoria del último aviso evita entre **3,4× (BTC) y 5× (ETH)** las alertas, y se
+  eligieron los umbrales con datos: con 3/5/8 —lo primero que propusimos— BTC habría hablado **un
+  solo día en todo el año** (el desplome del 10-oct-2025), así que quedó en **2 / 3,5 / 6%** →
+  BTC 1,5 alertas al mes en 11 días distintos, ETH 5,8 en 40. Dos hallazgos anotados en el módulo:
+  con la ventana larga en 8% las cortas la tapaban **siempre** y no disparaba nunca; y con el mismo
+  número ETH alerta 3-4× más que BTC, que es la evidencia empírica de por qué hace falta la #3.
+  103 pruebas en total, sin Docker ni internet.)*
+- [x] **3.3b** La historia se completa sola al arrancar *(pedido sobre la marcha, no estaba en el plan)* ✅
+  *(`ponerse_al_dia()` en `app/ingesta/backfill.py` + `BACKFILL_AL_ARRANCAR`/`BACKFILL_DIAS` en la
+  config. El backfill existía desde el 2.1b pero había que **acordarse de correrlo a mano**, así que
+  cada apagón dejaba un hueco visible en el gráfico y, peor, sin historia fresca los detectores de
+  la Fase 3 comparan contra un "normal" viejo. Ahora al encender Argos pide los minutos que se
+  perdió. Va en **tarea de fondo**: en una base vacía esto baja un año y nadie va a esperar mirando
+  una pantalla en blanco. **Reintenta con espera creciente** (30 s → 5 min) en vez de rendirse,
+  porque acá Docker se levanta a mano y arrancar el backend antes que la base es lo normal — es la
+  misma razón por la que `db.py` reconecta perezosamente. Verificado borrando a propósito 3 horas de
+  historia: al reiniciar bajó 180 velas por símbolo —las 174 borradas más los minutos que habían
+  pasado— sin tocar nada más.)*
 - [ ] **3.4** Alerta #3 Volatilidad anómala (z-score) *(ya con algo de historia)*
 - [ ] **3.5** Alerta #4 Volumen anómalo
 - [ ] **3.6** Panel de alertas en el dashboard + configuración de umbrales
@@ -178,11 +210,17 @@ de cada una está en el [spec, §2.F](../../spec-crypto-monitor.md).
 
 ---
 
-**👉 Estamos aquí:** **Fases 0, 1 y 2 cerradas + 3.1 y 3.2 hechos.** Argos ya vigila algo de verdad:
-le dices "avísame si BTC pasa de 70.000" y te avisa cuando lo cruza, una sola vez, con los números que
-lo justifican. Falta que lo encuentre solo — las tres alertas que vienen (movimiento %, volatilidad,
-volumen) son las que no dependen de que tú sepas qué número mirar. Siguiente: **3.3 — Movimiento % en
-ventana**, el primero que usa la historia (`POR_VELA_CERRADA`) en vez del tick suelto.
+**👉 Estamos aquí:** **Fases 0, 1 y 2 cerradas + 3.1, 3.2 y 3.3 hechos.** Argos ya no solo vigila lo
+que tú le pides: encuentra cosas por su cuenta. Si BTC se mueve fuerte en cinco minutos, lo dice —una
+vez, con los números, y sin repetirlo mientras la ventana arrastra el mismo salto. Y desde el 3.3b se
+pone al día solo al encender, así que el gráfico y la historia contra la que comparan los detectores
+están completos desde el primer minuto.
+
+Lo que todavía le falta es **criterio propio**: el "2% en 5 minutos" lo elegimos nosotros, y quedó
+medido que con el mismo número ETH alerta 3-4 veces más que BTC. Siguiente: **3.4 — Volatilidad
+anómala (z-score)**, que en vez de preguntar "¿se movió más de X?" pregunta *"¿esto es raro para lo
+que este activo suele hacer?"*. Es la alerta que el spec señala como la clave anti-ruido y la que
+después alimenta las base rates de las probabilidades.
 
 ### Cómo levantar el frontend
 ```bash

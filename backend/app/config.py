@@ -49,6 +49,16 @@ class Settings(BaseSettings):
     # cambio de código. Se apaga poniendo INGESTA_ACTIVA=false en el entorno.
     ingesta_activa: bool = True
 
+    # --- Historia (backfill) ---
+    # Al arrancar, Argos tapa solo el hueco que dejó el último apagado pidiéndole a
+    # Binance los minutos que se perdió. Es incremental: si no falta nada, no baja nada.
+    # Se apaga con BACKFILL_AL_ARRANCAR=false (útil para trabajar sin salir a internet).
+    backfill_al_arrancar: bool = True
+    # Cuánta historia se quiere tener hacia atrás. Con la base ya poblada esto no
+    # descarga de nuevo: solo marca hasta dónde se considera que la historia está
+    # completa. En una base vacía, en cambio, es lo que se baja el primer arranque.
+    backfill_dias: int = 365
+
     # --- Detección de alertas (Fase 3) ---
     # Si está en false, los detectores no corren: la ingesta y el panel siguen igual,
     # pero nadie evalúa ni emite alertas. Sirve para trabajar en otra cosa sin llenar

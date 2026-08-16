@@ -160,7 +160,27 @@ frecuente porque los umbrales van en números redondos.
 **3.2b HECHO (corrección al 3.1)**: `Detector.evaluar()` devuelve **`list[Alerta]`**, ya no
 `Alerta | None`. Con umbrales en 70.000 y 71.000, un tick de 69.900 a 71.200 cruza los dos y el segundo
 quedaba marcado como visto sin haber avisado nunca. Se cambió con 2 detectores en el repo y no con 5.
-**Siguiente: 3.3 (alerta #2, movimiento % en ventana — el primero `POR_VELA_CERRADA`).**
+**3.3 HECHO (alerta #2, movimiento % en ventana — el primer `POR_VELA_CERRADA`)**:
+`detectores/movimiento_porcentual.py`. Mide **cierre contra cierre** de hace N minutos (el rango
+máx-mín mide agitación y eso es la #3: dos detectores contando la misma noticia no son dos
+detectores). Tres ventanas (5/15/60 min) y se emite **solo la más corta que saltó**; la clave lleva
+la dirección y NO la ventana, para que las tres compartan el silencio. **Idea central, hermana del
+"cruzar no es estar": moverse no es haberse movido** — un pump de 4% sigue dentro de la ventana de
+1 h durante la hora siguiente, así que al emitir se anota desde qué precio se avisó y no se repite
+hacia el mismo lado salvo que el movimiento continúe otro tanto. La referencia se busca **por marca
+de tiempo, no por posición** (un minuto sin operaciones correría la ventana en silencio); si esa
+vela no está, no se opina — no se aproxima con la más cercana. **Los umbrales se eligieron con
+datos, no a ojo**: rebobinando el detector sobre los 369 días de historia real de la base (que es
+el argumento del 3.1 cobrado: un detector puro se puede correr sobre el pasado), 3/5/8 dejaba a BTC
+hablando **un solo día en todo el año** → quedó en **2 / 3,5 / 6%** (BTC 1,5 alertas/mes, ETH 5,8).
+Ahí también se midió que la memoria del último aviso evita 3,4× (BTC) a 5× (ETH) las alertas.
+**3.3b HECHO (la historia se completa sola al arrancar, pedido sobre la marcha)**: `ponerse_al_dia()`
+en `ingesta/backfill.py`, lanzado desde el `lifespan` (`BACKFILL_AL_ARRANCAR`, `BACKFILL_DIAS`). El
+backfill ya existía pero había que acordarse de correrlo a mano y cada apagón dejaba hueco. Va en
+tarea de fondo (en base vacía baja un año) y **reintenta con espera creciente 30 s → 5 min**, porque
+acá Docker se levanta a mano y arrancar el backend antes que la base es lo normal.
+**Siguiente: 3.4 (alerta #3, volatilidad anómala por z-score — la que le da criterio propio: el
+porcentaje fijo del 3.3 no se adapta al activo, y quedó medido que ETH alerta 3-4× más que BTC).**
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.

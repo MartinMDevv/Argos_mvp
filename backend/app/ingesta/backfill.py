@@ -287,6 +287,59 @@ async def rellenar(simbolos: list[str], dias: int = DIAS_POR_DEFECTO) -> dict[st
     return resultado
 
 
+ESPERA_INICIAL = 30.0
+"""Cuánto espera antes del primer reintento si la puesta al día no salió."""
+
+ESPERA_MAXIMA = 300.0
+"""Techo de la espera entre reintentos. Misma idea que en la reconexión a Binance:
+insistir cada vez más despacio en vez de martillar un servicio que no está."""
+
+
+async def ponerse_al_dia(simbolos: list[str], dias: int = DIAS_POR_DEFECTO) -> None:
+    """Tapa al arrancar el hueco que dejó el último apagado. Insiste hasta lograrlo.
+
+    Corre como tarea de fondo: la API no espera a que termine, así que el panel abre
+    enseguida y el gráfico se va completando solo mientras baja la historia.
+
+    ## Por qué reintenta en vez de rendirse
+    Acá el Docker se levanta a mano, así que arrancar el backend antes que la base es lo
+    normal, no la excepción — `db.py` ya está hecho con esa idea (reconexión perezosa).
+    Si esto fuera un intento único, cada vez que el orden se diera vuelta Argos se
+    quedaría toda la sesión con el gráfico cortado y sin decir por qué. Lo mismo si al
+    encender todavía no hay red.
+
+    Termina cuando lo consigue: mientras Argos corre no se abren huecos nuevos, porque
+    de eso se encarga la ingesta en vivo.
+    """
+    from app.esquema import aplicar_esquema
+
+    espera = ESPERA_INICIAL
+
+    while True:
+        try:
+            # El esquema va en cada intento a propósito: si el primero falló porque la
+            # base no estaba, cuando vuelva puede ser una base recién creada y vacía.
+            await aplicar_esquema()
+            resultado = await rellenar(simbolos, dias=dias)
+        except Exception as error:
+            logger.warning(
+                "No se pudo completar la historia (%s). Reintento en %.0f s", error, espera
+            )
+            await asyncio.sleep(espera)
+            espera = min(espera * 2, ESPERA_MAXIMA)
+            continue
+
+        nuevas = sum(resultado.values())
+        if nuevas:
+            logger.info(
+                "Historia al día: %s",
+                ", ".join(f"{simbolo} +{cuantas:,}" for simbolo, cuantas in resultado.items()),
+            )
+        else:
+            logger.info("Historia al día: no faltaba nada")
+        return
+
+
 async def _principal() -> None:
     parser = argparse.ArgumentParser(
         description="Baja a la base la historia de velas de 1 minuto desde Binance."

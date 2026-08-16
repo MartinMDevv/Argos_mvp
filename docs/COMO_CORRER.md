@@ -50,8 +50,8 @@ Verificar:
   (intervalos: `1m`, `5m`, `15m`, `1h`, `4h`, `1d`)
 - http://localhost:8000/mercado/resumen → precio + cambio % (1h/24h/7d) + máx/mín/volumen del día
   de cada símbolo. Filtrable: `?simbolos=BTCUSDT&simbolos=ETHUSDT`.
-  **Si un plazo sale `null` es que falta historia de ese tramo** — no es un error: corre el backfill
-  (`uv run python -m app.ingesta.backfill --dias 365`). Mira también `minutos_24h`: cuántos de los
+  **Si un plazo sale `null` es que falta historia de ese tramo** — no es un error: espera a que termine
+  la puesta al día del arranque (o corre el backfill a mano). Mira también `minutos_24h`: cuántos de los
   1.440 minutos del día tienen datos. Con menos de 1.440, el volumen es el de esos minutos y nada más.
 - `ws://localhost:8000/ws/mercado` → canal en vivo. Para probarlo sin frontend:
   ```bash
@@ -115,7 +115,15 @@ empieza a necesitar la base, hay que mirar qué se rompió en el diseño antes d
 ### Traer la historia que Argos no vivió (paso 2.1b)
 
 Argos solo tiene lo que escuchó desde que lo encendiste. Para que el gráfico se vea continuo —y sobre
-todo para que los detectores de la Fase 3 tengan con qué comparar— se baja la historia real de Binance:
+todo para que los detectores de la Fase 3 tengan con qué comparar— se baja la historia real de Binance.
+
+**Desde el paso 3.3b esto pasa solo**: al arrancar la API, Argos le pide a Binance los minutos que se
+perdió mientras estuvo apagado. Corre en segundo plano (no retrasa el arranque) y reintenta si la base
+o la red todavía no están, así que **no hay que acordarse de nada**. Se apaga con
+`BACKFILL_AL_ARRANCAR=false` y se le cambia el alcance con `BACKFILL_DIAS` (365 por defecto).
+
+Sigue estando el comando a mano, útil para pedir más historia hacia atrás de la que baja el arranque
+o para poblar la base sin levantar la API:
 
 ```bash
 cd backend
@@ -215,8 +223,9 @@ npx tsc -b        # solo el chequeo de tipos, sin compilar
 - **`en_espera` que no baja** en `/mercado/estado` significa que la ingesta anda pero la base no está
   recibiendo. Revisa `/health/db`. Los ticks no se pierden mientras tanto (hay 20.000 de colchón).
 - **Pocas velas al principio, y con huecos**: Argos solo arma velas de lo que escuchó, y cada apagón deja
-  un hueco. **La solución es el backfill** (más arriba): corrélo una vez y el gráfico queda continuo. Los
-  huecos que queden después de correrlo son minutos posteriores a la última descarga → vuelve a correrlo.
+  un hueco. Desde el 3.3b **el arranque lo tapa solo** (busca `Historia al día` en el log). Si igual ves
+  huecos: o la descarga todavía va en curso —un año tarda unos minutos—, o falló y está reintentando
+  (aparece `No se pudo completar la historia … reintento en N s`), o alguien puso `BACKFILL_AL_ARRANCAR=false`.
 - **La vela dice de dónde salió** (campo `fuente`): `propia` si la armamos con nuestros ticks, `historia`
   si vino del backfill, `mixta` si el tramo abarca las dos. Ojo con `operaciones`: en las propias son
   operaciones **agrupadas** y en las históricas son las **reales** (siempre más). No los compares entre sí.

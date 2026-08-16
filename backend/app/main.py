@@ -20,6 +20,10 @@ Alertas:
 Desde el paso 1.2, al arrancar la API se encienden tareas de fondo que corren para siempre:
 escuchar Binance, guardar en TimescaleDB, difundir a los paneles conectados (1.4) y, desde
 el 3.1, evaluar los detectores y guardar las alertas que emitan.
+
+Y una que sí termina: al encender, Argos le pide a Binance los minutos que se perdió
+mientras estuvo apagado, para que el gráfico se vea completo desde el primer momento sin
+tener que acordarse de correr el backfill a mano (`BACKFILL_AL_ARRANCAR=false` lo apaga).
 """
 
 import asyncio
@@ -45,6 +49,7 @@ from app.difusion import GestorDeConexiones, emitir_estado
 from app.esquema import aplicar_esquema
 from app.estado import EstadoMercado
 from app.ingesta.almacen import EscritorDeTicks
+from app.ingesta.backfill import ponerse_al_dia
 from app.ingesta.binance import SIMBOLOS_MVP, escuchar_ticks
 from app.modelos import Tick
 from app.resumen import PLAZOS, obtener_resumen, resumen_a_json
@@ -89,6 +94,20 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         logger.warning("Base de datos no disponible al arrancar: %s", error)
 
     tareas: list[asyncio.Task[None]] = []
+
+    # Lo primero que se lanza: completar la historia que falte desde el último apagado.
+    # Va en tarea de fondo y no bloqueando el arranque, porque en una base vacía esto
+    # baja un año y nadie quiere esperar a que termine para ver el panel. Mientras baja,
+    # la ingesta en vivo ya está guardando el presente.
+    if settings.backfill_al_arrancar:
+        tareas.append(
+            asyncio.create_task(
+                ponerse_al_dia(list(SIMBOLOS_MVP), dias=settings.backfill_dias),
+                name="backfill-arranque",
+            )
+        )
+    else:
+        logger.info("Puesta al día de la historia desactivada (BACKFILL_AL_ARRANCAR=false)")
 
     if settings.ingesta_activa:
 
