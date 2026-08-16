@@ -347,22 +347,15 @@ de cada una está en el [spec, §2.F](../../spec-crypto-monitor.md).
 
 ---
 
-**👉 Estamos aquí:** **Fases 0, 1 y 2 cerradas + 3.1, 3.2 y 3.3 hechos.** Argos ya no solo vigila lo
-que tú le pides: encuentra cosas por su cuenta. Si BTC se mueve fuerte en cinco minutos, lo dice —una
-vez, con los números, y sin repetirlo mientras la ventana arrastra el mismo salto. Y desde el 3.3b se
-pone al día solo al encender, así que el gráfico y la historia contra la que comparan los detectores
-están completos desde el primer minuto.
+**👉 Estamos aquí:** **Fases 0, 1, 2 y 3 CERRADAS. Fase 4 a medias.**
 
-Y con el **3.4** y el **3.5** ya tiene criterio propio: ni la volatilidad ni el volumen se juzgan
-contra un número que pusimos nosotros, sino contra lo que ese activo viene haciendo —y, en el caso
-del volumen, contra lo que hace **a esta hora**—. **Las cuatro alertas del MVP están hechas.** Entre
-las cuatro hablan unas 10 veces al mes por símbolo, medido sobre un año de historia real.
+Argos ya no solo vigila lo que tú le pides: **encuentra cosas por su cuenta**. Las cuatro alertas del
+MVP están hechas y calibradas contra un año de historia real — entre las cuatro hablan unas 10 veces
+al mes por símbolo, que es exactamente el "bajo ruido" que pide el spec. Se pone al día solo al
+encender, muestra cada hallazgo con la evidencia que lo justifica, avisa en el momento por WebSocket,
+y **no queda ni un dato inventado en la aplicación**.
 
-Y con el **3.6** todo eso ya se ve: el panel dejó de tener datos inventados, la vista Alertas
-muestra la evidencia de cada hallazgo y los umbrales se ponen desde la pantalla. **FASE 3 COMPLETA.**
-
-Y con el **4.2** Argos ya te busca dentro de la app: las alertas llegan por el WebSocket en cuanto
-se emiten y salta un cartel estés en la vista que estés.
+Detalle de la sesión que cerró la Fase 3: [`./avance-2026-08-16.md`](./avance-2026-08-16.md).
 
 Siguiente: **4.1 — el bot de Telegram**, para enterarse **sin** tener la app abierta, que es el
 sentido del proyecto. **Ese paso te necesita a ti**: hay que crear el bot con BotFather y

@@ -18,9 +18,9 @@ Argos_MVP/
 El **flujo de datos** (cuando esté todo conectado): un exchange (Binance) → el **backend** ingiere
 y guarda en **TimescaleDB** (infra) → los **detectores** miran esos datos y generan alertas → el
 **frontend** consume la API/WebSocket y muestra todo → la **IA local** (Ollama) explica en palabras.
-Hoy (Fase 1 completa) el tramo Binance → backend → TimescaleDB → velas → WebSocket funciona de punta a
-punta, y el **gráfico de velas del panel ya lo consume en vivo** (paso 2.1). Siguen en mock la
-watchlist, la tabla de mercados y el sidebar → paso 2.2.
+Hoy (Fases 1, 2 y 3 completas) la cadena Binance → backend → TimescaleDB → velas → WebSocket → panel
+funciona de punta a punta, **los cuatro detectores del MVP corren** y el panel muestra lo que ven con
+la evidencia a la vista. No queda nada en mock. Falta la última pata: la IA local (Fase 5).
 
 ---
 
@@ -392,8 +392,9 @@ frontend/
 - **Los números se formatean en `lib/formato.ts`, nunca a mano.** Formato chileno vía `Intl` (punto de
   miles, coma decimal) y signo menos de verdad (`−`, U+2212). Cuando no hay dato va `SIN_DATO` (`—`),
   **nunca un cero**: un cero afirma "no se movió" y eso es decir algo que no sabemos.
-- **Datos reales en todo el panel** desde el 2.2b. El único mock que queda es `PriceVolChart.tsx`,
-  y la tarjeta que lo contiene lo dice en su encabezado.
+- **Datos reales en todo el panel.** Desde el 4.3 no queda ningún mock: `PriceVolChart.tsx` —el
+  último que quedaba— dibuja 24 h reales, y la volatilidad sale de `GET /mercado/volatilidad`, que
+  usa **la misma medida que la alerta #3** para que panel y detector no digan cosas distintas.
 - **Nunca escribir `dangerouslySetInnerHTML={{ __html: … }}` dentro del render.** El objeto va
   fuera del componente. React compara esa prop **por identidad del objeto**, no por el string:
   uno nuevo en cada pasada hace que reescriba el `innerHTML` del SVG entero, y con nodos nuevos
@@ -487,8 +488,9 @@ boceto— y pasaron a `GET /mercado/resumen`. **Ese archivo ya no existe.**
   distingue más detalle, y pedir 1.440 velas de 1 minuto sería mover mil veces más datos de los que se
   ven. Sin datos no se dibuja nada — una línea plana diría "no se movió".
 - **Lo que no se sabe se muestra como `—`, nunca como cero.** Aplica a los plazos que el backend manda
-  en `null` (falta historia) y a la volatilidad σ, que la va a calcular el detector de z-score en la
-  Fase 3. Un `3,4σ` de relleno se leería como una medición.
+  en `null` (falta historia) y a la volatilidad cuando el activo no tiene ni cinco horas de datos: una
+  mediana sacada de un rato describe ese rato, no al activo. Mientras el detector de volatilidad no
+  existió, la columna estuvo vacía a propósito — un `3,4σ` de relleno se habría leído como medición.
 - **`minutos_24h` se muestra.** Si la cobertura del día es parcial, el KPI de volumen lo dice en oro
   (`parcial · 1.435/1.440 min`) en vez de presentar el volumen de 1.435 minutos como el del día.
 - **Bug que encontró la verificación**: el rango de 24 h se abreviaba con un decimal y en ETH salía

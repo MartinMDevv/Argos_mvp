@@ -3,10 +3,10 @@
 > Guía para levantar el proyecto de cero. Para entender qué es cada carpeta, ver
 > [`./ARQUITECTURA.md`](./ARQUITECTURA.md).
 
-Argos tiene **tres patas** que se levantan por separado. El backend usa la base de datos y sirve datos
-reales, y desde el paso 2.1 el **gráfico del panel los consume en vivo** (el resto del panel sigue en
-mock). El orden recomendado es: **infra → backend → frontend**, y ahora importa de verdad: sin backend,
-el gráfico avisa que no hay conexión en vez de dibujar.
+Argos tiene **tres patas** que se levantan por separado. El orden recomendado es
+**infra → backend → frontend**, y importa: sin backend el panel avisa que no hay conexión en vez de
+dibujar. Desde el paso 4.3 **no queda nada en mock** — todo lo que se ve en pantalla sale de datos
+reales o dice que no los hay.
 
 ## Requisitos
 
@@ -53,7 +53,12 @@ Verificar:
   **Si un plazo sale `null` es que falta historia de ese tramo** — no es un error: espera a que termine
   la puesta al día del arranque (o corre el backfill a mano). Mira también `minutos_24h`: cuántos de los
   1.440 minutos del día tienen datos. Con menos de 1.440, el volumen es el de esos minutos y nada más.
-- `ws://localhost:8000/ws/mercado` → canal en vivo. Para probarlo sin frontend:
+- http://localhost:8000/mercado/volatilidad → cuánto se agita normalmente cada activo: el rango
+  verdadero mediano de un tramo de 5 min en las últimas 24 h. **Es la misma medida que usa la alerta
+  #3**, a propósito: si el panel midiera distinto que el detector, las dos pantallas dirían cosas
+  distintas del mismo mercado. Un símbolo con menos de 5 h de datos no aparece (es un "no sé").
+- `ws://localhost:8000/ws/mercado` → canal en vivo. Empuja precios (`estado`), señal de vida
+  (`latido`) y, desde el paso 4.2, cada **alerta** en cuanto se emite. Para probarlo sin frontend:
   ```bash
   uv run python -c "
   import asyncio, json
@@ -69,10 +74,12 @@ Verificar:
   Si escribiste un detector en `app/detectores/` y **no aparece acá**, no se registró: lo más
   probable es que le falte el decorador `@registrar`. Mira también `silenciadas`: son alertas
   correctas que repetían algo ya dicho, así que un número alto es el antirruido funcionando.
+  Lo mismo se ve **sin terminal** en la vista Configuración del panel (paso 4.3).
 - http://localhost:8000/alertas → lo que Argos vio, de lo más nuevo a lo más viejo.
   Filtrable: `?simbolo=BTCUSDT`, `?detector=umbral_precio`, `?limite=100`.
   Cada alerta trae su `evidencia`: los números crudos con los que el detector concluyó, para que
-  puedas rehacer la cuenta.
+  puedas rehacer la cuenta. En el panel es la vista **Alertas**, donde cada una se abre y muestra
+  esa cuenta sin pasar por la API (paso 3.6).
 - http://localhost:8000/umbrales → los precios que pediste vigilar (alerta #1, paso 3.2).
   Para agregar uno:
   ```bash
@@ -102,7 +109,7 @@ Verificar:
 
 ```bash
 cd backend
-uv run pytest              # todo (80 pruebas, ~0,07 s)
+uv run pytest              # todo (139 pruebas, ~0,2 s)
 uv run pytest -v           # con el nombre de cada una
 uv run pytest pruebas/test_silencio.py    # un solo archivo
 ```

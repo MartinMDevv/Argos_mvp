@@ -293,4 +293,5 @@ Salta a un doc solo si necesitas su detalle. Conforme avance el proyecto se agre
 | [`./ARQUITECTURA.md`](./ARQUITECTURA.md) | Distribución del repo (backend/frontend/infra) + mapa de componentes del frontend | Ubicar dónde vive algo o cómo se conectan las patas |
 | [`./COMO_CORRER.md`](./COMO_CORRER.md) | Requisitos + comandos para levantar cada pata + gotchas | Arrancar el proyecto o recordar un comando |
 | [`../README.md`](../README.md) | Presentación del repo, estructura y cómo levantarlo | Onboarding rápido o comandos de arranque |
-| *(avance-fase-N.md)* | *(Notas de avance por fase — se enlazan aquí al crearlas)* | Detalle de lo hecho en una fase concreta |
+| [`./avance-2026-08-16.md`](./avance-2026-08-16.md) | Bitácora de la sesión que cerró la Fase 3: las 4 alertas, cómo se calibraron y qué salió mal primero | Entender por qué un umbral vale lo que vale, o repasar de dónde salió una decisión |
+| *(avance-AAAA-MM-DD.md)* | *(Bitácoras de sesión — se enlazan aquí al crearlas)* | Detalle de lo hecho en una sesión concreta |

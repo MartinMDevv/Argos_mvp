@@ -39,20 +39,24 @@ Detalle de cada carpeta y del mapa de componentes del frontend:
 
 ## Estado
 
-🚧 **En construcción — Fases 0, 1 y 2 cerradas; Fase 3 (las alertas) en marcha.**
+🚧 **En construcción — Fases 0, 1, 2 y 3 cerradas; Fase 4 (avisos) en marcha.**
 
 La cadena anda de punta a punta: Argos escucha el WebSocket de Binance, guarda cada operación en
 TimescaleDB, la resume en velas y se las empuja al panel, que las dibuja moviéndose en vivo. Tiene un
 año de historia real traída de Binance, así que el gráfico no arranca vacío ni con huecos, y todo el
 panel usa datos reales.
 
-Desde la Fase 3 existe el motor de alertas: los detectores son plugins (agregar uno es crear un
-archivo), cada alerta se guarda con los números que la justifican, y hay un antirruido que evita
-contar veinte veces la misma noticia. La primera alerta ya funciona: **umbral de precio** — le dices
-"avísame si BTC pasa de 70.000" y te avisa cuando lo cruza.
+**Las cuatro alertas del MVP funcionan**, y las tres últimas no dependen de que uno sepa qué número
+mirar: umbral de precio (el que pones tú), movimiento fuerte, volatilidad anómala y volumen anómalo.
+Los detectores son plugins —agregar uno es crear un archivo—, cada alerta se guarda con los números
+que la justifican y un antirruido evita contar veinte veces la misma noticia.
 
-Falta que Argos encuentre cosas **por su cuenta**: las alertas de movimiento porcentual, volatilidad
-y volumen anómalo, que son las que no dependen de que uno sepa qué número mirar. Después, el panel de
+Los umbrales de cada detector **no se eligieron a ojo**: salieron de correrlos sobre un año de
+historia real hasta dejarlos en unas diez alertas al mes por activo. El panel muestra cada hallazgo
+con su evidencia, avisa en el momento por WebSocket, y no queda ni un dato inventado en la app.
+
+Falta que Argos te encuentre **fuera de la pantalla** (Telegram) y que la IA local ponga en palabras
+lo que ve. Después, el panel de
 alertas, Telegram y la IA que explica.
 
 Estado tildable en [`docs/CHECKLIST.md`](docs/CHECKLIST.md).
