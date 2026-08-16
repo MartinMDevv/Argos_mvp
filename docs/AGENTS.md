@@ -246,6 +246,14 @@ inventados (arma el estado real y aclara que no es un modelo) y sin `dangerously
 pie del menú refleja el socket de verdad; vista Configuración nueva (estado de API/base/WS/ingesta
 + qué detectores corren). ⚠️ Recordatorio: cada vista nueva necesita su regla
 `.app[data-view="X"] .v-X` en el CSS o queda en blanco.
+**4.4 HECHO (sección Chat a pantalla completa, pedida sobre la marcha)**: `lib/chat.tsx`
+(proveedor con la conversación), `components/ChatView.tsx`, `ChatIsland.tsx` reescrito. El botón
+del menú lleva a una **vista propia**; el de la cabecera sigue abriendo la **isla**. Las dos leen
+la MISMA conversación — si cada componente guardara sus mensajes, cambiar de vista los borraría
+(React desmonta), que es el mismo motivo por el que el WS, el resumen y las alertas viven arriba
+del árbol. Entrar a la sección cierra la isla. Argos responde con datos medidos si la pregunta va
+de mercado, y si no dice que todavía no sabe conversar: a "¿cuál va a subir mañana?" NO inventa
+pronóstico.
 **Siguiente: 4.1 — bot de Telegram. NECESITA AL USUARIO: hay que crear el bot con BotFather y
 conseguir el token; el asistente no maneja credenciales. El enganche del lado del código ya
 existe (`al_emitir`).**

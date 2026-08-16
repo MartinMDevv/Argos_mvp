@@ -299,6 +299,25 @@ TimescaleDB → velas → empujado al panel.
   corren y con qué cadencia — mirar a Argos por dentro sin abrir una terminal. La fila "+ agregar
   activo a favoritos" era un control muerto y pasó a ser una línea que dice la verdad.)*
 
+- [x] **4.4** Sección Chat a pantalla completa *(pedida sobre la marcha)* ✅
+  *(`lib/chat.tsx` (proveedor), `components/ChatView.tsx`, `ChatIsland.tsx` reescrito. El botón
+  "Chat con Argos" del menú ya no abre la isla lateral: lleva a una **sección propia** que ocupa
+  toda la pantalla, con sugerencias de lo que Argos sí sabe responder, historial y campo anclado
+  abajo. La isla sigue existiendo y la abre el botón de la cabecera — resuelven cosas distintas:
+  la isla es para preguntar **sin dejar de mirar** el gráfico, la sección para leer con calma una
+  respuesta de ocho líneas que no entra en una columna de 360 px.
+  **Las dos leen la misma conversación**, y eso obligó a sacar los mensajes de los componentes a
+  un proveedor: si cada uno guardara los suyos, escribir en la isla y abrir la sección mostraría
+  una pantalla en blanco, y peor, al cambiar de vista React desmonta el componente y el historial
+  se perdería solo. Es el mismo argumento del WebSocket, el resumen y las alertas.
+  Entrar a la sección cierra la isla: son dos ventanas a lo mismo y tenerlas abiertas a la vez es
+  mostrar el contenido dos veces robándole ancho al chat. El botón "sacar como ventana (pronto)"
+  de la isla —que no hacía nada— ahora lleva a la sección, que es lo que prometía.
+  Argos responde con **datos medidos o con la verdad**: si la pregunta va de mercado arma el
+  estado real y aclara que entender preguntas llega en la Fase 5; si no, dice que todavía no sabe
+  conversar. A "¿cuál va a subir mañana?" **no inventa un pronóstico**, que es exactamente lo que
+  el spec prohíbe.)*
+
 ## FASE 5 — IA mínima on-demand
 - [ ] **5.1** Instalar Ollama + modelo cuantizado → verificar que usa la GPU (RTX 3060)
 - [ ] **5.2** Botón *"resumime el mercado ahora"* → la IA explica el estado actual (sin probabilidades)

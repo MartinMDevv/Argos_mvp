@@ -5,6 +5,7 @@ import App from './App.tsx'
 import { ProveedorMercado } from '@/lib/mercado'
 import { ProveedorResumen } from '@/lib/resumen'
 import { ProveedorAlertas } from '@/lib/alertas'
+import { ProveedorChat } from '@/lib/chat'
 
 // Los proveedores van acá arriba de todo a propósito: así hay UNA sola conexión WebSocket, UN
 // solo pedido periódico de resumen y UNO de alertas para toda la app, y ninguno se cae ni se
@@ -18,7 +19,11 @@ createRoot(document.getElementById('root')!).render(
     <ProveedorMercado>
       <ProveedorResumen>
         <ProveedorAlertas>
-          <App />
+          {/* El chat va por dentro de todos: arma sus respuestas con los precios, el resumen y
+              las alertas, así que necesita poder leerlos. */}
+          <ProveedorChat>
+            <App />
+          </ProveedorChat>
         </ProveedorAlertas>
       </ProveedorResumen>
     </ProveedorMercado>

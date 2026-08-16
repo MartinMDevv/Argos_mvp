@@ -11,7 +11,8 @@ import type { View } from '@/App'
 interface Props {
   view: View
   setView: (v: View) => void
-  openChat: () => void
+  /** Lleva a la sección Chat a pantalla completa (no a la isla: eso lo hace la cabecera). */
+  irAlChat: () => void
   order: string[]
   pinned: Record<string, boolean>
   par: string
@@ -26,7 +27,7 @@ interface Props {
 export function Sidebar({
   view,
   setView,
-  openChat,
+  irAlChat,
   order,
   pinned,
   par,
@@ -86,7 +87,11 @@ export function Sidebar({
       </button>
 
       <div className="navsec">Asistente</div>
-      <button type="button" className="nav-i" onClick={openChat}>
+      <button
+        type="button"
+        className={`nav-i ${view === 'chat' ? 'on' : ''}`}
+        onClick={irAlChat}
+      >
         <Icon name="chat" /> <span className="lbl">Chat con Argos</span>
       </button>
 

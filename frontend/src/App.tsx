@@ -9,9 +9,10 @@ import { MercadosView } from '@/components/MercadosView'
 import { AlertasView } from '@/components/AlertasView'
 import { AvisoDeAlerta } from '@/components/AvisoDeAlerta'
 import { ConfiguracionView } from '@/components/ConfiguracionView'
+import { ChatView } from '@/components/ChatView'
 import { ChatIsland } from '@/components/ChatIsland'
 
-export type View = 'panel' | 'mercados' | 'alertas' | 'configuracion'
+export type View = 'panel' | 'mercados' | 'alertas' | 'chat' | 'configuracion'
 
 export default function App() {
   const { theme, toggle } = useTheme()
@@ -61,7 +62,12 @@ export default function App() {
       <Sidebar
         view={view}
         setView={setView}
-        openChat={() => setChatOpen(true)}
+        irAlChat={() => {
+          // Entrar a la sección cierra la isla: son dos ventanas a la misma conversación y
+          // tenerlas abiertas a la vez es mostrar lo mismo dos veces, robándole ancho al chat.
+          setChatOpen(false)
+          setView('chat')
+        }}
         order={order}
         pinned={pinned}
         par={par}
@@ -77,6 +83,9 @@ export default function App() {
           par={par}
           intervalo={intervalo}
           setIntervalo={setIntervalo}
+          /* El botón del encabezado abre la ISLA, no la sección: desde el gráfico uno quiere
+             preguntar sin perder de vista lo que está mirando. Para leer con calma está el
+             botón del menú, que sí lleva a la sección completa. */
           openChat={() => setChatOpen(true)}
         />
         {view === 'panel' && (
@@ -108,6 +117,11 @@ export default function App() {
             <AlertasView />
           </div>
         )}
+        {view === 'chat' && (
+          <div className="view v-chat">
+            <ChatView />
+          </div>
+        )}
         {view === 'configuracion' && (
           <div className="view v-configuracion">
             <ConfiguracionView theme={theme} toggleTheme={toggle} />
@@ -115,7 +129,13 @@ export default function App() {
         )}
       </main>
 
-      <ChatIsland close={() => setChatOpen(false)} />
+      <ChatIsland
+        close={() => setChatOpen(false)}
+        verSeccion={() => {
+          setChatOpen(false)
+          setView('chat')
+        }}
+      />
 
       {/* Fuera de <main> a propósito: el aviso tiene que verse desde cualquier vista, y no
           debe empujar el contenido cuando aparece. */}

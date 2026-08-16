@@ -176,6 +176,11 @@
   .app[data-view="mercados"] .v-mercados{display:flex; flex-direction:column; gap:12px;}
   .app[data-view="alertas"] .v-alertas{display:flex; flex-direction:column; gap:12px;}
   .app[data-view="configuracion"] .v-configuracion{display:flex; flex-direction:column; gap:12px;}
+  /* El chat ocupa el alto disponible: es una conversación, no una tarjeta más de la página.
+     Para eso `main` pasa a columna flexible solo en esta vista — en las demás el contenido
+     manda el alto y estirarlo dejaría tarjetas deformadas. */
+  .app[data-view="chat"] main{display:flex; flex-direction:column;}
+  .app[data-view="chat"] .v-chat{display:flex; flex-direction:column; flex:1; min-height:0;}
   /* transición suave al cambiar de vista */
   @keyframes viewin{from{opacity:0; transform:translateY(6px);}}
   .app[data-view="panel"] .v-panel, .app[data-view="mercados"] .v-mercados, .app[data-view="alertas"] .v-alertas{animation:viewin .22s ease;}
@@ -307,6 +312,45 @@
   .aviso-x{margin-left:auto; font-family:inherit; font-size:15px; line-height:1; color:var(--faint); background:none; border:0; cursor:pointer; padding:0 2px;}
   .aviso-x:hover{color:var(--text);}
   .aviso p{margin:6px 0 0; color:var(--muted); font-size:11.5px; line-height:1.5;}
+
+  /* ============ SECCIÓN CHAT (pantalla completa, paso 4.4) ============
+     La isla de la derecha sigue existiendo para preguntar sin soltar el gráfico; esto es para
+     leer con calma. Ancho de lectura acotado: una respuesta de ocho líneas estirada a 1.400 px
+     obliga a barrer la pantalla con la vista en cada renglón. */
+  .chatv{display:flex; flex-direction:column; flex:1; min-height:0;
+    background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm);}
+  .chatv-h{display:flex; align-items:center; gap:11px; padding:13px 15px; border-bottom:1px solid var(--line-soft);}
+  .chatv-t h3{margin:0; font-size:13px;}
+  .chatv-t span{font-size:11px; color:var(--faint);}
+  .chatv-h .lnk{margin-left:auto;}
+
+  .chatv-msgs{flex:1; overflow-y:auto; padding:16px 15px; display:flex; flex-direction:column; gap:16px; min-height:340px;}
+  .chatv-m{display:flex; gap:11px; max-width:78ch;}
+  .chatv-m .av{width:26px; height:26px; flex:none; border-radius:50%; display:grid; place-items:center;
+    background:var(--surface-2); border:1px solid var(--line); font-size:10px; color:var(--faint); font-weight:700;}
+  .chatv-m.tu{align-self:flex-end; flex-direction:row-reverse;}
+  .chatv-m.tu .chatv-cuerpo{background:color-mix(in srgb,var(--teal) 9%,transparent); border-color:var(--teal-dim);}
+  .chatv-cuerpo{background:var(--surface-2); border:1px solid var(--line-soft); border-radius:10px; padding:9px 12px;}
+  .chatv-cuerpo .who{font-size:10.5px; color:var(--faint); font-weight:600; margin-bottom:4px;}
+  .chatv-cuerpo .who span{font-family:var(--mono); font-weight:400; margin-left:5px;}
+  .chatv-cuerpo .texto{font-size:12.5px; line-height:1.65; color:var(--text);}
+
+  .chatv-vacio{margin:auto; text-align:center; max-width:52ch; padding:20px 0;}
+  /* La ilustración venía dimensionada por el ancho de la isla (360 px). Suelta en una vista
+     completa se estiraba a media pantalla: acá se le pone su propio tamaño. */
+  .chatv-vacio .ce-iso{width:132px; height:auto; margin:0 auto; display:block;}
+  .chatv-vacio h4{margin:14px 0 6px; font-size:14px;}
+  .chatv-vacio p{margin:0; color:var(--muted); font-size:12px; line-height:1.6;}
+  .chatv-vacio b{color:var(--text);}
+  .chatv-sug{display:flex; flex-wrap:wrap; gap:7px; justify-content:center; margin-top:14px;}
+
+  .chatv-in{display:flex; align-items:center; gap:9px; padding:11px 13px; border-top:1px solid var(--line-soft);}
+  .chatv-in input{flex:1; font-family:inherit; font-size:12.5px; color:var(--text); background:var(--surface-2);
+    border:1px solid var(--line-strong); border-radius:9px; padding:9px 12px;}
+  .chatv-in input::placeholder{color:var(--faint);}
+  .chatv-in .enviar{background:var(--teal); border:0; border-radius:9px; padding:9px 12px; cursor:pointer; display:flex;}
+  .chatv-in .enviar svg{width:15px; height:15px; stroke:var(--ground); fill:none; stroke-width:1.9;}
+  @media (max-width:640px){ .chatv-in .chip{display:none;} }
 
   /* El chat responde con texto plano y saltos de línea (paso 3.7): antes venía como HTML. */
   .cuerpo-texto{white-space:pre-line;}
