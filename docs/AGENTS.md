@@ -179,8 +179,22 @@ en `ingesta/backfill.py`, lanzado desde el `lifespan` (`BACKFILL_AL_ARRANCAR`, `
 backfill ya existía pero había que acordarse de correrlo a mano y cada apagón dejaba hueco. Va en
 tarea de fondo (en base vacía baja un año) y **reintenta con espera creciente 30 s → 5 min**, porque
 acá Docker se levanta a mano y arrancar el backend antes que la base es lo normal.
-**Siguiente: 3.4 (alerta #3, volatilidad anómala por z-score — la que le da criterio propio: el
-porcentaje fijo del 3.3 no se adapta al activo, y quedó medido que ETH alerta 3-4× más que BTC).**
+**3.4 HECHO (alerta #3, volatilidad anómala — la primera con criterio propio)**:
+`detectores/volatilidad.py`. Mide la **amplitud** del tramo (`(máx − mín) / apertura`) contra lo que
+el activo viene haciendo las últimas 24 h, así que el umbral sale de los datos y no de nosotros. Es
+otra pregunta que la #2: un tramo que sube 3% y vuelve tiene movimiento neto cero y amplitud enorme
+(#2 = ¿se fue a alguna parte?, #3 = ¿se está agitando?). **NO es el z-score de manual**: media y
+desviación las arrastran los propios picos, así que se usa **mediana + MAD ×1,4826** — hay una
+prueba que hace las dos cuentas y el pico que el robusto ve con z>40 el clásico lo ve con z=1,3.
+Tramos de **5m** contra **288 de referencia (24 h)**: en 1m serían 1.441, sobre el tope de 1.000 de
+`obtener_velas` (medido: 5m cuesta 22 ms, 15m 153 ms). Avisa **al entrar** en zona rara y se rearma
+al volver la calma (un episodio, un aviso), más un piso absoluto de amplitud.
+⚠️ **Lección de calibración**: con el umbral clásico (z 3-5) daba **90-130 alertas al mes**. Medida
+la distribución real (p50≈0, p90≈2,3, p99≈7, p99,9≈15, p99,99≈34) quedó claro que el z estaba bien
+construido y la escala de umbrales era la equivocada → **z 25** (rearme 8, `fuerte` 50, piso 0,5%):
+BTC 1,9 alertas/mes, ETH 2,4/mes, y el 10-oct-2025 da UNA alerta. **Regla que confirma el 3.3: los
+umbrales de un detector se eligen rebobinando sobre la historia real, nunca a ojo.**
+**Siguiente: 3.5 (alerta #4, volumen anómalo — la última de las cuatro del MVP).**
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.

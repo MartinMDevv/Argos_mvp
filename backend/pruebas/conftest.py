@@ -82,9 +82,12 @@ def hacer_contexto(
     tick: Tick | None = None,
     velas: tuple[Vela, ...] = (),
     simbolo: str = "BTCUSDT",
+    intervalo: str = "1m",
 ) -> ContextoDeEvaluacion:
     """Lo que vería un detector en un momento dado."""
-    return ContextoDeEvaluacion(simbolo=simbolo, momento=MOMENTO, tick=tick, velas=velas)
+    return ContextoDeEvaluacion(
+        simbolo=simbolo, momento=MOMENTO, tick=tick, velas=velas, intervalo=intervalo
+    )
 
 
 # -- Detectores de mentira ----------------------------------------------------

@@ -173,7 +173,28 @@ TimescaleDB → velas → empujado al panel.
   misma razón por la que `db.py` reconecta perezosamente. Verificado borrando a propósito 3 horas de
   historia: al reiniciar bajó 180 velas por símbolo —las 174 borradas más los minutos que habían
   pasado— sin tocar nada más.)*
-- [ ] **3.4** Alerta #3 Volatilidad anómala (z-score) *(ya con algo de historia)*
+- [x] **3.4** Alerta #3 Volatilidad anómala (z-score) ✅
+  *(`app/detectores/volatilidad.py`. **La primera alerta con criterio propio**: el umbral no lo
+  ponemos nosotros, sale del propio activo. Mide la **amplitud** del tramo —`(máx − mín) / apertura`—
+  contra lo que ese activo viene haciendo las últimas 24 h. Es a propósito otra pregunta que la #2:
+  un tramo que sube 3% y vuelve tiene movimiento neto CERO y amplitud enorme, o sea que para la #2
+  no pasó nada y ahí hubo pánico. #2 = ¿se fue a alguna parte? · #3 = ¿se está agitando?
+  **No es el z-score de manual, y ese es el punto**: media y desviación las arrastran los propios
+  picos, así que después de un desplome Argos quedaría ciego 24 h y en calma total alertaría de
+  cualquier cosa. Se usa **mediana + MAD** (×1,4826), que se calculan con el orden de los datos y no
+  con su suma. Hay una prueba que hace las dos cuentas sobre los mismos números: el pico que el
+  criterio robusto ve con z>40, el clásico lo ve con z=1,3 — invisible.
+  Tramos de **5 minutos** contra **288 de referencia (24 h)**: en velas de 1m serían 1.441, por
+  encima del tope de 1.000 de `obtener_velas` (medido: la consulta de 5m cuesta 22 ms, la de 15m
+  153 ms). Se avisa **al entrar** en zona rara y no se repite hasta que vuelve la calma: un episodio,
+  un aviso. Más un **piso absoluto** de amplitud, porque "diez veces más agitado que nada" sigue
+  siendo nada.
+  **La primera calibración salió mal y quedó documentada**: con el umbral clásico (z 3-5) daba
+  **90-130 alertas al mes**. Midiendo la distribución real sobre los 369 días de la base se vio por
+  qué — p50≈0, p90≈2,3, p99≈7, p99,9≈15, p99,99≈34: el z estaba bien construido, la escala de
+  umbrales era la equivocada. Quedó en **z 25** (rearme 8 ≈ p99, `fuerte` 50, piso 0,5%) →
+  **BTC 1,9 alertas/mes, ETH 2,4/mes**, y el desplome del 10-oct-2025 produce **una** alerta, no una
+  ráfaga. 119 pruebas, sin Docker ni internet.)*
 - [ ] **3.5** Alerta #4 Volumen anómalo
 - [ ] **3.6** Panel de alertas en el dashboard + configuración de umbrales
 
@@ -216,11 +237,10 @@ vez, con los números, y sin repetirlo mientras la ventana arrastra el mismo sal
 pone al día solo al encender, así que el gráfico y la historia contra la que comparan los detectores
 están completos desde el primer minuto.
 
-Lo que todavía le falta es **criterio propio**: el "2% en 5 minutos" lo elegimos nosotros, y quedó
-medido que con el mismo número ETH alerta 3-4 veces más que BTC. Siguiente: **3.4 — Volatilidad
-anómala (z-score)**, que en vez de preguntar "¿se movió más de X?" pregunta *"¿esto es raro para lo
-que este activo suele hacer?"*. Es la alerta que el spec señala como la clave anti-ruido y la que
-después alimenta las base rates de las probabilidades.
+Y con el **3.4** ya tiene criterio propio: la volatilidad no se juzga contra un número que pusimos
+nosotros sino contra lo que ese activo viene haciendo, que es lo que el spec pide para que la alerta
+sirva igual en BTC que en una moneda chica. Siguiente: **3.5 — Volumen anómalo**, la última de las
+cuatro del MVP y la que, según el spec, suele *preceder* al movimiento en vez de acompañarlo.
 
 ### Cómo levantar el frontend
 ```bash
