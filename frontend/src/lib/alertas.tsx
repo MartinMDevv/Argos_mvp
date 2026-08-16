@@ -10,12 +10,12 @@
  * serían tres pollings pidiendo lo mismo y desincronizándose entre sí. Se pide arriba del todo y
  * todos leen de acá.
  *
- * ## Por qué se pregunta y no se empuja
- * El WebSocket ya existe y podría llevar las alertas, pero no se hizo así todavía y la diferencia
- * importa poco: los detectores por vela se evalúan una vez por minuto (o cada cinco), así que un
- * refresco cada diez segundos no atrasa nada que se note. Empujarlas por el socket es el próximo
- * escalón natural y está anotado — cuando llegue la Fase 4 (Telegram), la difusión de alertas ya
- * va a tener que existir de todos modos.
+ * ## Se pregunta Y se empuja, y no es redundancia
+ * Desde el paso 4.2 el backend manda cada alerta por el WebSocket en cuanto la emite, así que
+ * aparecen al instante en vez de esperar al próximo refresco. El pedido periódico se queda igual
+ * y cumple otro papel: es el que llena la lista al abrir la app, y el que la repara si el socket
+ * estuvo caído justo cuando saltó algo. Uno da inmediatez, el otro da la verdad — el mismo trato
+ * que ya tienen el gráfico y el resumen.
  *
  * ## Lo "no leído" vive solo en el navegador
  * Marcar una alerta como vista es una preferencia de esta pantalla, no un hecho del mercado: no
@@ -29,6 +29,7 @@ import type { ReactNode } from 'react'
 
 import { obtenerAlertas } from './api'
 import type { AlertaJSON } from './api'
+import { alLlegarAlerta } from './mercado'
 
 /**
  * Cada cuánto se le vuelve a preguntar al backend.
@@ -54,6 +55,10 @@ interface Estado {
   sinLeer: number
   /** Marca todo lo que hay ahora como visto. */
   marcarVistas: () => void
+  /** La última alerta que llegó por el socket **en esta sesión**, para el aviso en pantalla. */
+  ultimaLlegada: AlertaJSON | null
+  /** Cierra el aviso en pantalla. La alerta sigue en el feed: solo se va el cartel. */
+  descartarAviso: () => void
 }
 
 const Contexto = createContext<Estado | null>(null)
@@ -69,6 +74,7 @@ export function ProveedorAlertas({ children }: { children: ReactNode }) {
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [ultimaVista, setUltimaVista] = useState<number>(leerUltimaVista)
+  const [ultimaLlegada, setUltimaLlegada] = useState<AlertaJSON | null>(null)
 
   useEffect(() => {
     const control = new AbortController()
@@ -99,6 +105,21 @@ export function ProveedorAlertas({ children }: { children: ReactNode }) {
     }
   }, [])
 
+  // Lo que llega por el socket entra al instante, sin esperar al próximo pedido.
+  useEffect(
+    () =>
+      alLlegarAlerta((alerta) => {
+        setAlertas((previas) => {
+          // El pedido periódico puede traer la misma alerta que ya entró por el socket: se
+          // descarta por id en vez de mostrarla dos veces.
+          if (previas.some((otra) => otra.id === alerta.id)) return previas
+          return [alerta, ...previas].slice(0, CUANTAS)
+        })
+        setUltimaLlegada(alerta)
+      }),
+    [],
+  )
+
   const marcarVistas = useCallback(() => {
     const masNueva = alertas[0]?.id ?? 0
     setUltimaVista(masNueva)
@@ -110,9 +131,11 @@ export function ProveedorAlertas({ children }: { children: ReactNode }) {
     [alertas, ultimaVista],
   )
 
+  const descartarAviso = useCallback(() => setUltimaLlegada(null), [])
+
   const valor = useMemo(
-    () => ({ alertas, cargando, error, sinLeer, marcarVistas }),
-    [alertas, cargando, error, sinLeer, marcarVistas],
+    () => ({ alertas, cargando, error, sinLeer, marcarVistas, ultimaLlegada, descartarAviso }),
+    [alertas, cargando, error, sinLeer, marcarVistas, ultimaLlegada, descartarAviso],
   )
 
   return <Contexto.Provider value={valor}>{children}</Contexto.Provider>

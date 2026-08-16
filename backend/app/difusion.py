@@ -12,6 +12,11 @@ generar decenas de operaciones por segundo, y ningún ojo humano —ni React— 
 redibujar 40 veces por segundo. Mandaríamos muchísimo tráfico para que el navegador tire casi
 todo. En vez de eso mandamos una **foto cada `INTERVALO_DIFUSION`**, y solo si cambió algo.
 
+## Las alertas viajan por el mismo socket (paso 4.2)
+Desde la Fase 4, además del estado se empujan las alertas en cuanto se emiten, con el tipo
+`alerta`. Es lo que permite que el panel avise sin que nadie lo mire: hasta ahora había que
+esperar al próximo refresco del feed, y una alerta que llega tarde ya no es una alerta.
+
 ## El latido
 Si el mercado se queda quieto no hay nada que mandar, y una conexión muda es indistinguible de
 una conexión muerta. Cada `SEGUNDOS_LATIDO` sin novedades mandamos un `latido` para que el panel
@@ -20,6 +25,7 @@ sepa que Argos sigue ahí, mirando.
 
 import asyncio
 import logging
+from collections import deque
 from datetime import UTC, datetime
 
 from fastapi import WebSocket
@@ -96,6 +102,64 @@ class GestorDeConexiones:
                 # vez que alguien cierra la pestaña justo en el momento equivocado.
                 logger.debug("Panel caído durante el envío: %s", resultado)
                 self.desconectar(websocket)
+
+
+class ColaDeAlertas:
+    """Las alertas recién emitidas, esperando su viaje al panel (paso 4.2).
+
+    ## Por qué hay una cola en el medio
+    Una alerta puede nacer en la ruta caliente de la ingesta, donde no se puede esperar a
+    nada: el motor la deja acá con una función normal (`encolar`, sin `await`) y sigue.
+    Después, una tarea de fondo la manda. Es la misma división que ya usan el escritor de
+    ticks y el despachador de alertas, por la misma razón.
+
+    ## Y por qué esta cola SÍ se puede tirar
+    La cola de guardado del motor conserva las alertas aunque la base esté caída, porque
+    una alerta perdida es peor que una tardía. Acá es al revés: si no hay ningún panel
+    abierto, notificar no tiene a quién. **La alerta no se pierde igual** —está guardada
+    en la base y aparece en el feed cuando alguien entre—; lo que se descarta es el aviso
+    en vivo, que fuera de su momento no sirve para nada.
+    """
+
+    def __init__(self, maximo: int = 100) -> None:
+        self._pendientes: deque[dict[str, object]] = deque(maxlen=maximo)
+
+    def encolar(self, alerta: dict[str, object]) -> None:
+        """Deja una alerta lista para enviar. Sin `await`: la llama el motor."""
+        self._pendientes.append(alerta)
+
+    def vaciar(self) -> list[dict[str, object]]:
+        """Se lleva todo lo pendiente de una vez."""
+        salida = list(self._pendientes)
+        self._pendientes.clear()
+        return salida
+
+
+async def emitir_alertas(
+    gestor: GestorDeConexiones,
+    cola: ColaDeAlertas,
+    intervalo: float = INTERVALO_DIFUSION,
+) -> None:
+    """Bucle que empuja al panel las alertas recién emitidas. No termina.
+
+    Va aparte de `emitir_estado` a propósito, aunque las dos manden por el mismo socket:
+    el estado es una **foto** que se manda solo si cambió y de la que se pueden saltear
+    versiones sin consecuencia, y una alerta es un **hecho puntual** que se manda entero o
+    no se manda. Mezclarlas obligaría a que el bucle del estado supiera de alertas.
+    """
+    logger.info("Difusión de alertas activa")
+
+    while True:
+        await asyncio.sleep(intervalo)
+
+        pendientes = cola.vaciar()
+        if not pendientes or gestor.cantidad == 0:
+            continue
+
+        for alerta in pendientes:
+            await gestor.difundir(
+                {"tipo": "alerta", "momento": datetime.now(UTC).isoformat(), "alerta": alerta}
+            )
 
 
 async def emitir_estado(

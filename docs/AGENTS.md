@@ -226,8 +226,20 @@ avisa: ahí una lista vacía no es "no tienes ninguno" sino "no sabemos". El con
 lo no leído contra un id guardado en `localStorage` (es preferencia de pantalla, no un hecho: no va
 a la base). ⚠️ Al agregar una vista nueva hay que sumarla al CSS (`.app[data-view="X"] .v-X`) o
 queda en blanco: `.view{display:none}` es el estado por defecto.
-**Siguiente: FASE 4 — 4.1 bot de Telegram, 4.2 notificaciones en el panel. Hoy hay que estar
-mirando la pantalla para enterarse, y el sentido de Argos es no tener que mirarla.**
+**4.2 HECHO (notificaciones dentro del panel)**: `ColaDeAlertas` + `emitir_alertas()` en
+`difusion.py`, `al_emitir` en el motor, `components/AvisoDeAlerta.tsx`. Las alertas viajan por el
+**mismo WebSocket del 1.4** con tipo `alerta`: antes había que esperar hasta 10 s al refresco del
+feed y estar en la vista correcta. **Avisar y guardar quedaron separados** — el motor avisa en el
+instante en que la alerta pasa el antirruido y el guardado sigue su camino; si el oyente revienta
+se anota y la alerta sigue (perder una detección por fallar al notificar sería el peor
+intercambio). Ahí mismo se engancha Telegram en el 4.1. **Esta cola SÍ se puede tirar**, al revés
+que la del guardado: sin paneles abiertos el aviso no tiene a quién, y la alerta no se pierde
+porque está en la base. Sin cola de carteles: si llegan tres seguidas se muestra la última.
+Verificado en vivo con un umbral a un centavo del precio: cartel + feed + contador + banner, todo
+al instante. `pruebas/test_motor.py` cubre el aviso (139 pruebas en total).
+**Siguiente: 4.1 — bot de Telegram. NECESITA AL USUARIO: hay que crear el bot con BotFather y
+conseguir el token; el asistente no maneja credenciales. El enganche del lado del código ya
+existe (`al_emitir`).**
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.

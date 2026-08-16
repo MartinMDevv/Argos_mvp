@@ -252,7 +252,26 @@ TimescaleDB → velas → empujado al panel.
 
 ## FASE 4 — Notificaciones
 - [ ] **4.1** Crear el bot de Telegram y conectar el envío de alertas
-- [ ] **4.2** Notificaciones dentro del panel
+- [x] **4.2** Notificaciones dentro del panel ✅
+  *(`ColaDeAlertas` + `emitir_alertas()` en `app/difusion.py`, `al_emitir` en el motor,
+  `components/AvisoDeAlerta.tsx` y el proveedor de alertas escuchando el socket. **Las alertas
+  ahora viajan por el WebSocket que ya existía desde el 1.4**, con tipo `alerta`: antes había que
+  esperar hasta diez segundos al refresco del feed **y** estar mirando la vista correcta. Una
+  alerta que llega tarde ya no es una alerta.
+  **Avisar y guardar quedaron separados**: el motor llama a `al_emitir` en el mismo instante en que
+  la alerta pasa el antirruido, y el guardado en la base sigue su propio camino. Si escribir tarda
+  o falla —la base puede estar caída— el aviso no espera a eso. Y si quien escucha revienta, se
+  anota y la alerta sigue su curso: perder una detección por un fallo al notificar sería el peor
+  intercambio posible. Ahí mismo se engancha Telegram en el 4.1.
+  **Esta cola sí se puede tirar, al revés que la del guardado**: sin paneles abiertos el aviso en
+  vivo no tiene a quién, y la alerta no se pierde igual porque está en la base. Lo que se descarta
+  es el aviso, que fuera de su momento no sirve.
+  El cartel se va solo a los 12 s, se puede cerrar y lleva a la vista Alertas. **No hay cola de
+  carteles**: si llegan tres seguidas se muestra la última, porque apilar avisos es el ruido que
+  todo el resto del proyecto evita. El pedido periódico se queda igual y ahora cumple otro papel:
+  llenar la lista al abrir y repararla si el socket estuvo caído — inmediatez por un lado, verdad
+  por el otro, el mismo trato que ya tienen el gráfico y el resumen. Verificado en vivo con un
+  umbral puesto a un dólar del precio.)*
 
 ## FASE 5 — IA mínima on-demand
 - [ ] **5.1** Instalar Ollama + modelo cuantizado → verificar que usa la GPU (RTX 3060)
@@ -297,9 +316,13 @@ las cuatro hablan unas 10 veces al mes por símbolo, medido sobre un año de his
 Y con el **3.6** todo eso ya se ve: el panel dejó de tener datos inventados, la vista Alertas
 muestra la evidencia de cada hallazgo y los umbrales se ponen desde la pantalla. **FASE 3 COMPLETA.**
 
-Siguiente: **FASE 4 — que Argos te encuentre a ti**. Hoy hay que estar mirando la pantalla para
-enterarse, y el sentido del proyecto es no tener que mirarla: toca el bot de Telegram (4.1) y las
-notificaciones dentro del panel (4.2).
+Y con el **4.2** Argos ya te busca dentro de la app: las alertas llegan por el WebSocket en cuanto
+se emiten y salta un cartel estés en la vista que estés.
+
+Siguiente: **4.1 — el bot de Telegram**, para enterarse **sin** tener la app abierta, que es el
+sentido del proyecto. **Ese paso te necesita a ti**: hay que crear el bot con BotFather y
+conseguir el token, y el asistente no maneja credenciales. Del lado del código el enganche ya está
+puesto (`al_emitir` en el motor), así que es conectar y probar.
 
 ### Cómo levantar el frontend
 ```bash

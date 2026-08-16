@@ -7,6 +7,7 @@ import { MarketHeader } from '@/components/MarketHeader'
 import { PanelView } from '@/components/PanelView'
 import { MercadosView } from '@/components/MercadosView'
 import { AlertasView } from '@/components/AlertasView'
+import { AvisoDeAlerta } from '@/components/AvisoDeAlerta'
 import { ChatIsland } from '@/components/ChatIsland'
 
 export type View = 'panel' | 'mercados' | 'alertas'
@@ -88,6 +89,10 @@ export default function App() {
       </main>
 
       <ChatIsland close={() => setChatOpen(false)} />
+
+      {/* Fuera de <main> a propósito: el aviso tiene que verse desde cualquier vista, y no
+          debe empujar el contenido cuando aparece. */}
+      <AvisoDeAlerta verAlertas={() => setView('alertas')} />
     </div>
   )
 }

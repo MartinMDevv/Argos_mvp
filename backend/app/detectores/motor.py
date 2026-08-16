@@ -78,6 +78,7 @@ class MotorDeDetectores:
         detectores: Sequence[Detector],
         simbolos: Sequence[str],
         extras: Callable[[str, str], dict[str, object]] | None = None,
+        al_emitir: Callable[[Alerta], None] | None = None,
     ) -> None:
         self.estado = estado
         self.simbolos = list(simbolos)
@@ -92,6 +93,15 @@ class MotorDeDetectores:
         # (el perfil de volumen de la #4 se recalcula cada hora): guardar el valor acá lo
         # dejaría congelado en el momento del arranque.
         self._extras = extras
+
+        # A quién avisarle en el instante en que una alerta pasa el antirruido (paso 4.2).
+        # Es una función normal, sin `await`, porque esto se llama también desde la ruta
+        # caliente de la ingesta: lo único que puede hacer es dejar el aviso en una cola.
+        #
+        # Va separado del guardado a propósito. Guardar puede tardar o fallar —la base
+        # puede estar caída— y avisar no debería esperar a eso: la notificación sirve
+        # ahora o no sirve. Si más adelante hay que mandar a Telegram, se engancha acá.
+        self._al_emitir = al_emitir
 
         # Los separamos una sola vez, acá, en vez de filtrar en cada vuelta del bucle.
         self._por_tick = [d for d in self.detectores if d.cadencia is Cadencia.POR_TICK]
@@ -237,6 +247,7 @@ class MotorDeDetectores:
 
             self.silencio.anotar(alerta.clave, alerta.momento)
             self._encolar(alerta)
+            self._avisar(alerta)
 
             logger.info(
                 "ALERTA [%s] %s · %s — %s",
@@ -245,6 +256,21 @@ class MotorDeDetectores:
                 alerta.simbolo,
                 alerta.detalle,
             )
+
+    def _avisar(self, alerta: Alerta) -> None:
+        """Le pasa la alerta a quien esté escuchando, sin dejar que su error nos afecte.
+
+        El `try` no es decorativo: quien escucha es código de otra capa (hoy la difusión a
+        los paneles, mañana Telegram). Si eso revienta, la alerta ya está emitida y
+        encolada para guardarse, y perder la detección por un fallo al notificar sería el
+        peor intercambio posible.
+        """
+        if self._al_emitir is None:
+            return
+        try:
+            self._al_emitir(alerta)
+        except Exception as error:
+            logger.warning("No se pudo avisar de la alerta %s: %s", alerta.clave, error)
 
     def _encolar(self, alerta: Alerta) -> None:
         """Mete la alerta en la cola de escritura y despierta al despachador."""

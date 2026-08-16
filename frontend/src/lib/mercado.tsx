@@ -26,7 +26,7 @@ import { createContext, useContext, useEffect, useState } from 'react'
 import type { ReactNode } from 'react'
 
 import { URL_WS } from './api'
-import type { EstadoSimbolo, MensajeMercado } from './api'
+import type { AlertaJSON, EstadoSimbolo, MensajeMercado } from './api'
 
 /** Primera espera antes de reintentar. Se va duplicando si el backend sigue sin responder. */
 const ESPERA_INICIAL = 1_000
@@ -45,6 +45,26 @@ export interface Mercado {
 }
 
 const ContextoMercado = createContext<Mercado>({ simbolos: {}, conectado: false })
+
+/**
+ * Quién quiere enterarse de una alerta apenas llega (paso 4.2).
+ *
+ * El socket es uno solo y lo maneja este archivo, así que las alertas entran por acá aunque
+ * de ellas se ocupe `alertas.tsx`. En vez de meter las alertas en el estado del mercado —que
+ * es la foto de precios y no tiene nada que ver—, se reparten a quien se anote. Así el
+ * proveedor de mercado no sabe qué se hace con ellas y el de alertas no sabe de sockets.
+ */
+type OyenteDeAlerta = (alerta: AlertaJSON) => void
+
+const oyentes = new Set<OyenteDeAlerta>()
+
+/** Se anota para recibir cada alerta que llegue. Devuelve la función para darse de baja. */
+export function alLlegarAlerta(oyente: OyenteDeAlerta): () => void {
+  oyentes.add(oyente)
+  return () => {
+    oyentes.delete(oyente)
+  }
+}
 
 export function ProveedorMercado({ children }: { children: ReactNode }) {
   const [simbolos, setSimbolos] = useState<Record<string, EstadoSimbolo>>({})
@@ -78,6 +98,12 @@ export function ProveedorMercado({ children }: { children: ReactNode }) {
 
         // El latido no trae datos, solo demuestra que Argos sigue mirando.
         if (mensaje.tipo === 'latido') return
+
+        // Una alerta no es una foto del mercado: no toca `simbolos` y se reparte aparte.
+        if (mensaje.tipo === 'alerta') {
+          for (const oyente of oyentes) oyente(mensaje.alerta)
+          return
+        }
 
         setSimbolos(mensaje.simbolos)
       }

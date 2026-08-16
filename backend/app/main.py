@@ -9,6 +9,7 @@ Mercado:
     GET  /mercado/velas   → velas OHLCV para dibujar el gráfico                   (paso 1.3)
     GET  /mercado/resumen → precio + cambio % (1h/24h/7d) + máx/mín/volumen 24h   (paso 2.2)
     WS   /ws/mercado      → el backend EMPUJA los precios en vivo                 (paso 1.4)
+                            …y las alertas en cuanto se emiten                    (paso 4.2)
 
 Alertas:
     GET    /detectores    → qué vigila Argos y con qué cadencia                   (paso 3.1)
@@ -46,7 +47,7 @@ from app.detectores import registro as registro_de_detectores
 from app.detectores import umbrales as config_umbrales
 from app.detectores.motor import MotorDeDetectores
 from app.detectores.volumen import CLAVE_PERFIL
-from app.difusion import GestorDeConexiones, emitir_estado
+from app.difusion import ColaDeAlertas, GestorDeConexiones, emitir_alertas, emitir_estado
 from app.esquema import aplicar_esquema
 from app.estado import EstadoMercado
 from app.ingesta.almacen import EscritorDeTicks
@@ -64,12 +65,15 @@ logger = logging.getLogger(__name__)
 estado_mercado = EstadoMercado()
 escritor_de_ticks = EscritorDeTicks()
 gestor_de_paneles = GestorDeConexiones()
+cola_de_alertas = ColaDeAlertas()
 
 # Los detectores se descubren al importar este módulo: cada archivo de `app/detectores/`
 # se importa y sus clases decoradas con `@registrar` quedan en el catálogo. Si alguno
 # está mal definido, revienta acá — al arrancar, con un mensaje claro — y no a las tres
 # de la mañana dejando de emitir una alerta en silencio.
 registro_de_detectores.descubrir()
+
+
 def _extras_del_contexto(simbolo: str, intervalo: str) -> dict[str, object]:
     """Datos que un detector necesita y no salen de las velas (paso 3.5).
 
@@ -89,6 +93,10 @@ motor_de_alertas = MotorDeDetectores(
     detectores=registro_de_detectores.crear(),
     simbolos=SIMBOLOS_MVP,
     extras=_extras_del_contexto,
+    # Cada alerta que pasa el antirruido se deja en la cola de difusión para que el panel
+    # se entere en el momento (paso 4.2). Guardar en la base sigue su propio camino: son
+    # dos cosas distintas y ninguna debe esperar a la otra.
+    al_emitir=lambda alerta: cola_de_alertas.encolar(almacen_de_alertas.alerta_a_json(alerta)),
 )
 
 
@@ -183,6 +191,13 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     tareas.append(
         asyncio.create_task(
             emitir_estado(gestor_de_paneles, estado_mercado), name="difusion-paneles"
+        )
+    )
+    # Las alertas van por el mismo socket pero en su propia tarea: el estado es una foto que
+    # se puede saltear y una alerta es un hecho que no.
+    tareas.append(
+        asyncio.create_task(
+            emitir_alertas(gestor_de_paneles, cola_de_alertas), name="difusion-alertas"
         )
     )
 

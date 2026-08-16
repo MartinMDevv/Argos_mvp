@@ -193,7 +193,7 @@ export interface DetectorJSON {
 }
 
 /**
- * Los tres mensajes que empuja `WS /ws/mercado` (paso 1.4).
+ * Los mensajes que empuja `WS /ws/mercado` (paso 1.4; `alerta` desde el 4.2).
  *
  * Están tipados como unión discriminada por `tipo`: TypeScript obliga a mirar el `tipo` antes
  * de tocar `simbolos`, así que es imposible leer datos de un `latido` (que no los trae).
@@ -202,6 +202,8 @@ export type MensajeMercado =
   | { tipo: 'bienvenida'; momento: string; simbolos: Record<string, EstadoSimbolo> }
   | { tipo: 'estado'; momento: string; simbolos: Record<string, EstadoSimbolo> }
   | { tipo: 'latido'; momento: string }
+  /** Una alerta recién emitida (paso 4.2). Llega por el mismo socket que el estado. */
+  | { tipo: 'alerta'; momento: string; alerta: AlertaJSON }
 
 // ---------------------------------------------------------------------------
 // Llamadas
