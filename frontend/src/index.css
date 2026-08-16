@@ -140,6 +140,11 @@
   .sonar::before, .sonar::after{content:""; position:absolute; width:12px; height:12px; border-radius:50%; border:1px solid var(--gold); opacity:0; animation:sonar var(--sonarT,2.8s) ease-out infinite;}
   .sonar::after{animation-delay:calc(var(--sonarT,2.8s)/2);}
   .live.alert{--sonarT:1.4s;}
+  /* Sin conexión el sonar se apaga: un pulso dorado latiendo mientras el backend está caído
+     diría que Argos está vigilando cuando no lo está. */
+  .live.off{color:var(--faint);}
+  .live.off .sonar i{background:var(--faint); box-shadow:none;}
+  .live.off .sonar::before, .live.off .sonar::after{animation:none;}
   @keyframes sonar{0%{transform:scale(.4);opacity:.7}100%{transform:scale(1.9);opacity:0}}
   .live b{color:var(--text); font-weight:600;}
   @media (prefers-reduced-motion:reduce){ .sonar::before,.sonar::after{animation:none;} }
@@ -170,6 +175,7 @@
   .app[data-view="panel"] .v-panel{display:flex; flex-direction:column; gap:12px;}
   .app[data-view="mercados"] .v-mercados{display:flex; flex-direction:column; gap:12px;}
   .app[data-view="alertas"] .v-alertas{display:flex; flex-direction:column; gap:12px;}
+  .app[data-view="configuracion"] .v-configuracion{display:flex; flex-direction:column; gap:12px;}
   /* transición suave al cambiar de vista */
   @keyframes viewin{from{opacity:0; transform:translateY(6px);}}
   .app[data-view="panel"] .v-panel, .app[data-view="mercados"] .v-mercados, .app[data-view="alertas"] .v-alertas{animation:viewin .22s ease;}
@@ -302,6 +308,26 @@
   .aviso-x:hover{color:var(--text);}
   .aviso p{margin:6px 0 0; color:var(--muted); font-size:11.5px; line-height:1.5;}
 
+  /* El chat responde con texto plano y saltos de línea (paso 3.7): antes venía como HTML. */
+  .cuerpo-texto{white-space:pre-line;}
+  .guard-nota{margin:10px 2px 0; color:var(--faint); font-size:10.5px; line-height:1.5;}
+  .chat-tools .send{background:none; border:0; padding:0; cursor:pointer; display:flex; color:inherit;}
+
+  /* Vista Configuración: mirar a Argos por dentro sin abrir una terminal. */
+  .estado-grid{display:grid; grid-template-columns:repeat(auto-fit, minmax(190px, 1fr)); gap:9px;}
+  .estado-p{border:1px solid var(--line); border-radius:8px; padding:9px 11px; background:var(--surface-2);}
+  .estado-p .l{display:flex; align-items:center; gap:7px; font-size:11.5px; font-weight:600; color:var(--text);}
+  .estado-p .v{margin-top:4px; font-family:var(--mono); font-size:10.5px; color:var(--muted); word-break:break-word;}
+  .punto{width:7px; height:7px; border-radius:50%; flex:none;}
+  .punto.ok{background:var(--bull); box-shadow:0 0 6px color-mix(in srgb,var(--bull) 60%,transparent);}
+  .punto.mal{background:var(--bear);}
+  .detector{padding:10px 0; border-top:1px solid var(--line-soft);}
+  .detector:first-of-type{border-top:0;}
+  .det-t{display:flex; align-items:baseline; gap:9px; flex-wrap:wrap;}
+  .det-t b{font-size:12px;}
+  .detector p{margin:4px 0 0; color:var(--muted); font-size:11.5px; line-height:1.5;}
+  .det-m{margin-top:4px; color:var(--faint);}
+
   /* Umbrales: la única configuración del MVP que se toca desde la pantalla (paso 3.6). */
   .umbral-form{display:flex; flex-wrap:wrap; gap:7px; align-items:center; margin-bottom:11px;}
   .umbral-form select, .umbral-form input{font-family:inherit; font-size:11.5px; color:var(--text); background:var(--surface-2); border:1px solid var(--line-strong); border-radius:7px; padding:6px 9px;}
@@ -309,6 +335,9 @@
   .umbral-form input.nota{flex:1; min-width:120px;}
   .umbral-form button{font-family:inherit; font-size:11.5px; color:var(--bg,#0E0E11); background:var(--teal); border:1px solid var(--teal); border-radius:7px; padding:6px 13px; cursor:pointer; font-weight:600;}
   .umbral-form button:disabled{opacity:.5; cursor:not-allowed;}
+  /* Sin esto el SVG del botón no tiene tamaño propio y se estira hasta ocupar el botón entero. */
+  .umbral-form button{display:inline-flex; align-items:center; gap:7px; width:auto;}
+  .umbral-form button svg{width:14px; height:14px; flex:none; stroke:currentColor; fill:none; stroke-width:1.8;}
   .umbral{display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line-soft); font-size:11.5px;}
   .umbral:first-of-type{border-top:0;}
   .umbral .val{font-family:var(--mono); font-weight:600; color:var(--text);}
@@ -419,6 +448,32 @@
   @keyframes fanopen{from{transform:rotate(0deg) scale(.12); opacity:0;}}
   @keyframes eyein{from{transform:scale(.1); opacity:0;}}
   @media (prefers-reduced-motion:reduce){ .peacock.anim *{animation:none !important;} }
+
+  /* Menú colapsado a mano (mismas reglas que el rail automático de abajo, pero por elección
+     del usuario y no por ancho de pantalla). */
+  .navtoggle{margin-left:auto; background:none; border:0; padding:4px; cursor:pointer; color:var(--faint); display:flex; border-radius:6px;}
+  .navtoggle:hover{color:var(--text); background:var(--surface);}
+  .navtoggle svg{width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.7;}
+  .app[data-nav="rail"]{grid-template-columns:58px 1fr;}
+  .app[data-nav="rail"] nav{padding:12px 8px;}
+  .app[data-nav="rail"] nav .lbl,
+  .app[data-nav="rail"] nav .navsec,
+  .app[data-nav="rail"] .brand .wordmark,
+  .app[data-nav="rail"] .live .livetxt,
+  .app[data-nav="rail"] .nav-i .badge,
+  .app[data-nav="rail"] .pinnav-i .tk,
+  .app[data-nav="rail"] .pinnav-i .ch{display:none;}
+  .app[data-nav="rail"] .brand{justify-content:center; padding:6px 0 12px;}
+  .app[data-nav="rail"] .brand .peacock{width:26px; height:26px;}
+  /* Colapsado, el botón pasa debajo del logo en vez de esconderse: si desapareciera no
+     habría forma de volver a abrir el menú sin tocar el localStorage. */
+  .app[data-nav="rail"] .brand{flex-direction:column; gap:7px;}
+  .app[data-nav="rail"] .navtoggle{margin-left:0;}
+  .app[data-nav="rail"] .nav-i{justify-content:center; gap:0; padding:9px 0;}
+  .app[data-nav="rail"] .pinnav-i{justify-content:center; padding:6px 0;}
+  .app[data-nav="rail"] .live{justify-content:center; padding:8px 0;}
+  .app[data-nav="rail"] .themebtn{justify-content:center;}
+  .app[data-nav="rail"] .themebtn .lbl{display:none;}
 
   /* ============ RESPONSIVE ============ */
   @media (max-width:900px){

@@ -237,6 +237,15 @@ que la del guardado: sin paneles abiertos el aviso no tiene a quién, y la alert
 porque está en la base. Sin cola de carteles: si llegan tres seguidas se muestra la última.
 Verificado en vivo con un umbral a un centavo del precio: cartel + feed + contador + banner, todo
 al instante. `pruebas/test_motor.py` cubre el aviso (139 pruebas en total).
+**4.3 HECHO (revisión del frontend, pedida sobre la marcha)**: **no queda ningún dato inventado en
+la app**. Chat cerrado al arrancar (y NO se recuerda: abrirlo es del momento); menú colapsable que
+sí se recuerda; `PriceVolChart` con velas reales (96 × 15m = 24 h); **volatilidad real** en KPI,
+tabla y chat vía `GET /mercado/volatilidad` (`app/volatilidad.py`) — usa el **mismo rango verdadero
+mediano** que la alerta #3, para que panel y detector no midan distinto; chat sin números
+inventados (arma el estado real y aclara que no es un modelo) y sin `dangerouslySetInnerHTML`; el
+pie del menú refleja el socket de verdad; vista Configuración nueva (estado de API/base/WS/ingesta
++ qué detectores corren). ⚠️ Recordatorio: cada vista nueva necesita su regla
+`.app[data-view="X"] .v-X` en el CSS o queda en blanco.
 **Siguiente: 4.1 — bot de Telegram. NECESITA AL USUARIO: hay que crear el bot con BotFather y
 conseguir el token; el asistente no maneja credenciales. El enganche del lado del código ya
 existe (`al_emitir`).**

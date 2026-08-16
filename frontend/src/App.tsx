@@ -8,15 +8,31 @@ import { PanelView } from '@/components/PanelView'
 import { MercadosView } from '@/components/MercadosView'
 import { AlertasView } from '@/components/AlertasView'
 import { AvisoDeAlerta } from '@/components/AvisoDeAlerta'
+import { ConfiguracionView } from '@/components/ConfiguracionView'
 import { ChatIsland } from '@/components/ChatIsland'
 
-export type View = 'panel' | 'mercados' | 'alertas'
+export type View = 'panel' | 'mercados' | 'alertas' | 'configuracion'
 
 export default function App() {
   const { theme, toggle } = useTheme()
   const [view, setView] = useState<View>('panel')
-  // El chat arranca abierto en pantallas anchas; cerrado en angostas.
-  const [chatOpen, setChatOpen] = useState(() => !matchMedia('(max-width:1040px)').matches)
+  // El chat arranca CERRADO siempre. Antes se abría solo en pantallas anchas y se comía 360px
+  // del panel en cada arranque, cuando lo que uno viene a ver es el mercado: si quiere hablar
+  // con Argos, lo abre. Su estado no se recuerda a propósito — abrirlo es una decisión del
+  // momento, no una preferencia.
+  const [chatOpen, setChatOpen] = useState(false)
+
+  // El menú sí se recuerda: colapsarlo es una preferencia de cómo quieres trabajar, y que se
+  // vuelva a abrir en cada recarga sería pelearse con la app todos los días.
+  const [navRail, setNavRail] = useState(() => localStorage.getItem('argos:nav') === 'rail')
+
+  const alternarNav = () => {
+    setNavRail((colapsado) => {
+      const siguiente = !colapsado
+      localStorage.setItem('argos:nav', siguiente ? 'rail' : 'full')
+      return siguiente
+    })
+  }
 
   // Qué activo y qué tramo está mirando el usuario. Vive acá arriba porque lo tocan tres
   // lugares distintos —el menú, la watchlist y la cabecera— y todos tienen que mostrar lo
@@ -37,7 +53,11 @@ export default function App() {
   const seleccionar = setPar
 
   return (
-    <div className={`app ${chatOpen ? 'chat-open' : ''}`} data-view={view}>
+    <div
+      className={`app ${chatOpen ? 'chat-open' : ''}`}
+      data-view={view}
+      data-nav={navRail ? 'rail' : 'full'}
+    >
       <Sidebar
         view={view}
         setView={setView}
@@ -48,6 +68,8 @@ export default function App() {
         seleccionar={seleccionar}
         theme={theme}
         toggleTheme={toggle}
+        navRail={navRail}
+        alternarNav={alternarNav}
       />
 
       <main>
@@ -84,6 +106,11 @@ export default function App() {
         {view === 'alertas' && (
           <div className="view v-alertas">
             <AlertasView />
+          </div>
+        )}
+        {view === 'configuracion' && (
+          <div className="view v-configuracion">
+            <ConfiguracionView theme={theme} toggleTheme={toggle} />
           </div>
         )}
       </main>

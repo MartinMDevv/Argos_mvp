@@ -2,10 +2,12 @@ import {
   SIN_DATO,
   dineroCorto,
   direccion,
+  medida,
   porcentaje,
   precio as formatearPrecio,
 } from '@/lib/formato'
 import { useFichas } from '@/lib/resumen'
+import { useVolatilidad } from '@/lib/volatilidad'
 import { CoinLogo } from './CoinLogo'
 import { Pin } from './Pin'
 import { Sparkline } from './Sparkline'
@@ -22,12 +24,14 @@ interface Props {
 /**
  * Tabla densa de los activos vigilados: último precio, cambios por plazo, volumen y curva.
  *
- * La columna de volatilidad queda vacía a propósito hasta la Fase 3: el σ lo va a calcular el
- * detector de z-score sobre la historia, y hasta que exista se muestra el hueco. Un `3,4σ` de
- * relleno se leería como una medición.
+ * La columna de volatilidad muestra el rango verdadero mediano de 5 minutos en las últimas 24 h
+ * (`GET /mercado/volatilidad`), que es la misma medida con la que la alerta #3 juzga lo raro.
+ * Estuvo vacía hasta que ese detector existió: un `3,4σ` de relleno se habría leído como una
+ * medición, y no lo era.
  */
 export function MarketTable({ order, pinned, togglePin, par, seleccionar }: Props) {
   const fichas = useFichas(order)
+  const volatilidades = useVolatilidad(order)
 
   return (
     <div className="panel">
@@ -80,8 +84,8 @@ export function MarketTable({ order, pinned, togglePin, par, seleccionar }: Prop
                   <td className={direccion(cambios['24h'])}>{porcentaje(cambios['24h'])}</td>
                   <td className={direccion(cambios['7d'])}>{porcentaje(cambios['7d'])}</td>
                   <td>{dineroCorto(ficha.volumenCotizado24h)}</td>
-                  <td style={{ color: 'var(--faint)' }} title="La calcula el detector de z-score (Fase 3)">
-                    {SIN_DATO}
+                  <td title="Rango típico de un tramo de 5 min en las últimas 24 h">
+                    {medida(volatilidades[activo.par]?.tipico_pct ?? null)}
                   </td>
                   <td>
                     {/* 42 velas de 4 h = una semana, el mismo tramo que dice el encabezado. */}
@@ -97,8 +101,13 @@ export function MarketTable({ order, pinned, togglePin, par, seleccionar }: Prop
                 </tr>
               )
             })}
+            {/* La fila de "agregar activo" era un botón que no hacía nada. Mientras el MVP
+                vigile solo BTC y ETH, decirlo una vez es más honesto que ofrecer un control
+                muerto. */}
             <tr className="addrow">
-              <td colSpan={9}>+ agregar activo a favoritos · <span style={{ color: 'var(--faint)' }}>más allá de BTC/ETH → fase futura</span></td>
+              <td colSpan={9} style={{ color: 'var(--faint)' }}>
+                Argos vigila BTC y ETH. Sumar más activos es fase futura (v2.0).
+              </td>
             </tr>
           </tbody>
         </table>

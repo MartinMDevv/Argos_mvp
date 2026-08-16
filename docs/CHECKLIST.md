@@ -273,6 +273,32 @@ TimescaleDB → velas → empujado al panel.
   por el otro, el mismo trato que ya tienen el gráfico y el resumen. Verificado en vivo con un
   umbral puesto a un dólar del precio.)*
 
+- [x] **4.3** Revisión del frontend: que lo que se ve haga algo *(pedido sobre la marcha)* ✅
+  *(**No queda ningún dato inventado en la app.** Lo que se hizo, por orden de lo que se pidió:
+  **el chat arranca cerrado** —antes se abría solo en pantallas anchas y se comía 360 px del panel
+  en cada arranque, cuando lo que uno viene a ver es el mercado—; **el menú se colapsa** a una tira
+  de íconos y lo recuerda (el chat NO se recuerda a propósito: abrirlo es una decisión del momento,
+  colapsar el menú es una preferencia de trabajo); **Mercados quedó funcional**: el gráfico de
+  precio y volumen dibujaba veinte velas del boceto y ahora sale de `GET /mercado/velas` (96 tramos
+  de 15 min = 24 h exactas), y la **volatilidad dejó de decir "llega en Fase 3"** —ya llegó— con un
+  endpoint nuevo, `GET /mercado/volatilidad` (`app/volatilidad.py`), que devuelve el rango
+  verdadero mediano de 5 min de las últimas 24 h: **la misma medida que usa la alerta #3**, porque
+  si el panel midiera la volatilidad de otra forma que el detector, las dos pantallas dirían cosas
+  distintas del mismo mercado.
+  **El chat dejó de mentir**: mostraba una "conversación de ejemplo" con `$64.284` y `3,4σ`
+  inventados, contradiciendo dos líneas más abajo su propia promesa de no inventar números. Ahora
+  el botón arma el estado real —precios, cambios, volatilidad, últimas alertas— y aclara que lo
+  escribió la app y no un modelo; conversar de verdad sigue siendo Fase 5, y lo dice. De paso se
+  fueron los botones que no hacían nada (adjuntar, formato, micrófono, "sacar como ventana") y el
+  cuerpo del mensaje dejó de ser `dangerouslySetInnerHTML`, que era una puerta abierta a que lo
+  que uno escriba se interprete como HTML.
+  **El pie del menú también mentía**: decía "Vigilando · en vivo" con "1 anomalía activa" en el
+  tooltip pasara lo que pasara, incluso con el backend apagado; ahora refleja el socket y las
+  alertas de la última hora, y sin conexión el sonar se apaga. **Configuración dejó de ser un botón
+  muerto**: muestra el estado de la API, la base, el WebSocket y la ingesta, más qué detectores
+  corren y con qué cadencia — mirar a Argos por dentro sin abrir una terminal. La fila "+ agregar
+  activo a favoritos" era un control muerto y pasó a ser una línea que dice la verdad.)*
+
 ## FASE 5 — IA mínima on-demand
 - [ ] **5.1** Instalar Ollama + modelo cuantizado → verificar que usa la GPU (RTX 3060)
 - [ ] **5.2** Botón *"resumime el mercado ahora"* → la IA explica el estado actual (sin probabilidades)
@@ -289,12 +315,12 @@ Luego seguimos el **roadmap de versiones** (v1.1 → v5.0) del [spec](../../spec
 Ideas que salieron trabajando y quedaron parqueadas a propósito, para no desviar el MVP. El detalle
 de cada una está en el [spec, §2.F](../../spec-crypto-monitor.md).
 
-- [ ] **Revisión completa del frontend** — pantalla completa / expandir el gráfico, selector de rango
-  temporal (1D/1W/1M/3M/6M/YTD/1Y/All, que **no es lo mismo** que el intervalo de vela), enchufar los
-  botones `15m/1H/4H/1D` que hoy son decorativos, volumen real bajo el gráfico, leyenda O/H/L/C bajo
-  el cursor, logo del pavo real de verdad, estados de carga/error unificados, responsive y
-  accesibilidad. *Después del MVP funcional: pulir la vitrina de una tienda vacía es el orden
-  equivocado.*
+- [~] **Revisión completa del frontend** — *parcialmente hecha en el 4.3*: los botones de intervalo
+  ya funcionan (2.2b), el volumen real bajo el gráfico y la volatilidad ya están, y no queda ningún
+  dato inventado. **Sigue pendiente**: pantalla completa / expandir el gráfico, selector de rango
+  temporal (1D/1W/1M/3M/6M/YTD/1Y/All, que **no es lo mismo** que el intervalo de vela), leyenda
+  O/H/L/C bajo el cursor, logo del pavo real de verdad, estados de carga/error unificados,
+  responsive fino y accesibilidad.
 - [ ] **Medidor de veredicto técnico** (venta fuerte → compra fuerte) + rejilla de rendimiento por
   plazo + key stats + estacionalidad. Va en **v1.1**, que es cuando existirán los indicadores de los
   que tiene que salir. Ojo con la regla de oro: el medidor informa qué dicen los indicadores, **no

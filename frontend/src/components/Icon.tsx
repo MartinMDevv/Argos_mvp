@@ -20,6 +20,7 @@ const PATHS: Record<string, string> = {
   format: '<path d="M4 7V5a1 1 0 0 1 1-1h14a1 1 0 0 1 1 1v2M7 20h10M9 4v16"/>',
   mic: '<path d="M12 2a3 3 0 0 1 3 3v6a3 3 0 0 1-6 0V5a3 3 0 0 1 3-3zM5 11a7 7 0 0 0 14 0M12 18v3"/>',
   play: '<path d="M8 5v14l11-7z"/>',
+  colapsar: '<path d="M4 6h16M4 12h10M4 18h16"/>',
   pin: '<path d="M12 17v5"/><path d="M9 10.8a2 2 0 0 1-1.1 1.8l-1.8.9A2 2 0 0 0 5 15.3V16a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-.7a2 2 0 0 0-1.1-1.8l-1.8-.9A2 2 0 0 1 15 10.8V7a1 1 0 0 1 1-1 2 2 0 0 0 0-4H8a2 2 0 0 0 0 4 1 1 0 0 1 1 1z"/>',
 }
 

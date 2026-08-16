@@ -7,9 +7,11 @@ import {
   entero,
   porcentaje,
   rango,
+  medida,
   precio as formatearPrecio,
 } from '@/lib/formato'
 import { MINUTOS_DEL_DIA, useFicha } from '@/lib/resumen'
+import { useVolatilidad } from '@/lib/volatilidad'
 import { PriceVolChart } from './PriceVolChart'
 import { MarketTable } from './MarketTable'
 
@@ -24,14 +26,16 @@ interface Props {
 /**
  * Vista Mercados: los KPIs del activo seleccionado + precio/volumen + tabla de activos.
  *
- * Los cinco KPIs que se pueden calcular con lo que Argos tiene hoy salen de
- * `GET /mercado/resumen`. El de volatilidad queda en `—` a propósito: esa cifra la va a producir
- * el detector de z-score en la Fase 3, y ponerle mientras tanto un "3,4σ" de adorno sería
- * exactamente lo que la regla de oro prohíbe — un número que parece medido y no lo es.
+ * Cinco KPIs salen de `GET /mercado/resumen` y el de volatilidad de `GET /mercado/volatilidad`
+ * (paso 3.7): el rango verdadero mediano de un tramo de 5 minutos en las últimas 24 h, que es la
+ * misma medida con la que la alerta #3 decide qué es raro. Hasta que ese detector existió, el
+ * KPI mostraba `—`; ponerle mientras tanto un "3,4σ" de adorno habría sido exactamente lo que la
+ * regla de oro prohíbe, un número que parece medido y no lo es.
  */
 export function MercadosView({ par, order, pinned, togglePin, seleccionar }: Props) {
   const activo = activoDe(par)
   const ficha = useFicha(par)
+  const volatilidad = useVolatilidad([par])[par] ?? null
 
   const cambio24h = ficha?.cambios['24h'] ?? null
   const cambio7d = ficha?.cambios['7d'] ?? null
@@ -69,10 +73,14 @@ export function MercadosView({ par, order, pinned, togglePin, seleccionar }: Pro
           </div>
         </div>
 
-        <div className="kpi">
+        <div className="kpi" title="Rango verdadero mediano de un tramo de 5 minutos en las últimas 24 h. Es la medida que usa la alerta de volatilidad anómala.">
           <div className="l">Volatilidad</div>
-          <div className="v" style={{ color: 'var(--muted)' }}>{SIN_DATO}</div>
-          <div className="s num" style={{ color: 'var(--faint)' }}>llega en Fase 3</div>
+          <div className="v">{medida(volatilidad?.tipico_pct ?? null)}</div>
+          <div className="s num" style={{ color: 'var(--muted)' }}>
+            {volatilidad
+              ? `típico 5m · máx ${medida(volatilidad.maximo_pct)}`
+              : 'sin historia suficiente'}
+          </div>
         </div>
 
         <div className="kpi">
@@ -95,9 +103,9 @@ export function MercadosView({ par, order, pinned, togglePin, seleccionar }: Pro
           <h3>
             {activo ? `${activo.simbolo}/${activo.cotizacion}` : par} · precio &amp; volumen · 24h
           </h3>
-          <span className="mono-l stamp" title="Este gráfico todavía dibuja datos de ejemplo">FIG_03 · mock</span>
+          <span className="mono-l stamp">FIG_03</span>
         </div>
-        <PriceVolChart />
+        <PriceVolChart par={par} />
       </div>
 
       <MarketTable

@@ -355,6 +355,45 @@ export async function borrarUmbral(id: number): Promise<boolean> {
   return true
 }
 
+/**
+ * Lo agitado que está un activo (paso 3.7), tal cual lo manda `GET /mercado/volatilidad`.
+ *
+ * `tipico_pct` es el rango verdadero **mediano** de un tramo de 5 minutos en las últimas 24 h:
+ * la misma medida con la que la alerta #3 decide qué es raro. Que sea la misma no es un detalle
+ * — si el panel midiera la volatilidad de otra forma que el detector, las dos pantallas dirían
+ * cosas distintas del mismo mercado.
+ */
+export interface VolatilidadJSON {
+  tipico_pct: string
+  /** El tramo más movido de las 24 h: dice si el día tuvo un susto aunque la mediana sea baja. */
+  maximo_pct: string
+  tramos: number
+  minutos_por_tramo: number
+}
+
+/**
+ * La volatilidad típica de cada símbolo.
+ *
+ * Un símbolo con poca historia **no viene en la respuesta**: es un "no sé", no un cero. El panel
+ * muestra "—" en ese caso, igual que con los cambios porcentuales sin referencia.
+ */
+export async function obtenerVolatilidad(
+  pares: string[],
+  senal?: AbortSignal,
+): Promise<Record<string, VolatilidadJSON>> {
+  const parametros = new URLSearchParams()
+  for (const par of pares) parametros.append('simbolos', par)
+
+  const respuesta = await fetch(`${URL_API}/mercado/volatilidad?${parametros}`, { signal: senal })
+
+  if (!respuesta.ok) {
+    throw new Error(`El backend respondió ${respuesta.status} al pedir la volatilidad`)
+  }
+
+  const datos: { simbolos: Record<string, VolatilidadJSON> } = await respuesta.json()
+  return datos.simbolos
+}
+
 /** Trae el catálogo de detectores: qué vigila Argos ahora mismo. */
 export async function obtenerDetectores(senal?: AbortSignal): Promise<DetectorJSON[]> {
   const respuesta = await fetch(`${URL_API}/detectores`, { signal: senal })

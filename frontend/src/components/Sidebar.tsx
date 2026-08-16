@@ -2,6 +2,7 @@ import { activoDe } from '@/lib/activos'
 import { SIN_DATO, direccion, porcentaje } from '@/lib/formato'
 import { useFichas } from '@/lib/resumen'
 import { useAlertas } from '@/lib/alertas'
+import { useMercado } from '@/lib/mercado'
 import { Peacock } from './Peacock'
 import { CoinLogo } from './CoinLogo'
 import { Icon } from './Icon'
@@ -17,6 +18,9 @@ interface Props {
   seleccionar: (par: string) => void
   theme: 'dark' | 'light'
   toggleTheme: () => void
+  /** `true` cuando el menú está colapsado a la tira de íconos. */
+  navRail: boolean
+  alternarNav: () => void
 }
 
 export function Sidebar({
@@ -29,16 +33,38 @@ export function Sidebar({
   seleccionar,
   theme,
   toggleTheme,
+  navRail,
+  alternarNav,
 }: Props) {
   const pins = order.filter((p) => pinned[p])
   const fichas = useFichas(pins)
-  const { sinLeer } = useAlertas()
+  const { sinLeer, alertas } = useAlertas()
+  const { conectado } = useMercado()
+
+  // El pie del menú decía "Vigilando · en vivo" con una anomalía inventada en el `title`,
+  // pasara lo que pasara — incluso con el backend apagado. Ahora dice lo que hay: si el
+  // socket está abierto y si Argos vio algo en la última hora.
+  const recientes = alertas.filter(
+    (alerta) => Date.now() - new Date(alerta.momento).getTime() < 3600_000,
+  ).length
 
   return (
     <nav>
       <div className="brand">
         <Peacock size={30} anim />
         <h1 className="wordmark">Argos</h1>
+        {/* Colapsar el menú deja el panel más ancho, que es lo que uno quiere cuando está
+            mirando un gráfico. Los íconos se quedan: colapsado sigue siendo navegable. */}
+        <button
+          type="button"
+          className="navtoggle"
+          onClick={alternarNav}
+          title={navRail ? 'Expandir el menú' : 'Colapsar el menú'}
+          aria-label={navRail ? 'Expandir el menú' : 'Colapsar el menú'}
+          aria-pressed={navRail}
+        >
+          <Icon name="colapsar" />
+        </button>
       </div>
 
       <div className="navsec">Vigilancia</div>
@@ -102,14 +128,37 @@ export function Sidebar({
       <button type="button" className="nav-i soon">
         <Icon name="cuenta" /> <span className="lbl">Cuenta</span> <span className="badge">pronto</span>
       </button>
-      <button type="button" className="nav-i">
+      <button
+        type="button"
+        className={`nav-i ${view === 'configuracion' ? 'on' : ''}`}
+        onClick={() => setView('configuracion')}
+      >
         <Icon name="config" /> <span className="lbl">Configuración</span>
       </button>
 
       <div className="navfoot">
-        <div className="live alert" title="1 anomalía activa: el sonar late más rápido">
+        <div
+          className={`live ${conectado ? (recientes > 0 ? 'alert' : '') : 'off'}`}
+          title={
+            conectado
+              ? recientes > 0
+                ? `${recientes} ${recientes === 1 ? 'alerta' : 'alertas'} en la última hora`
+                : 'Conectado al backend, sin novedades en la última hora'
+              : 'Sin conexión con el backend: lo que se ve puede estar viejo'
+          }
+        >
           <span className="sonar"><i /></span>
-          <span className="livetxt"><b>Vigilando</b> · en vivo</span>
+          <span className="livetxt">
+            {conectado ? (
+              <>
+                <b>Vigilando</b> · en vivo
+              </>
+            ) : (
+              <>
+                <b>Sin conexión</b> · reintentando
+              </>
+            )}
+          </span>
         </div>
         <button type="button" className="themebtn" onClick={toggleTheme}>
           <Icon name={theme === 'dark' ? 'sun' : 'moon'} />

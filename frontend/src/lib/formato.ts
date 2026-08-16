@@ -54,6 +54,20 @@ export function porcentaje(valor: number | null): string {
   return `${signoDe(valor)}${DOS.format(Math.abs(valor))}%`
 }
 
+/**
+ * Un porcentaje que mide una magnitud, no un cambio: `0,03%`.
+ *
+ * Va sin signo a propósito, al revés que `porcentaje()`. La volatilidad no sube ni baja — es
+ * cuánto se movió el precio, y un `+0,03%` invitaría a leer una dirección que no existe.
+ * Recibe texto porque así viene del backend, que manda los números exactos sin pasar por float.
+ */
+export function medida(valor: string | null): string {
+  if (valor === null) return SIN_DATO
+  const numero = Number(valor)
+  if (!Number.isFinite(numero)) return SIN_DATO
+  return `${DOS.format(numero)}%`
+}
+
 /** Una diferencia de precio en plata, con signo: `+$1.164,20`. */
 export function diferencia(valor: number | null): string {
   if (valor === null || !Number.isFinite(valor)) return SIN_DATO

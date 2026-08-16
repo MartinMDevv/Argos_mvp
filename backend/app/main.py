@@ -8,6 +8,7 @@ Mercado:
     GET  /mercado/estado  → último precio de cada símbolo + salud de la ingesta   (paso 1.2)
     GET  /mercado/velas   → velas OHLCV para dibujar el gráfico                   (paso 1.3)
     GET  /mercado/resumen → precio + cambio % (1h/24h/7d) + máx/mín/volumen 24h   (paso 2.2)
+    GET  /mercado/volatilidad → cuánto se agita normalmente cada activo            (paso 3.7)
     WS   /ws/mercado      → el backend EMPUJA los precios en vivo                 (paso 1.4)
                             …y las alertas en cuanto se emiten                    (paso 4.2)
 
@@ -57,6 +58,7 @@ from app.modelos import Tick
 from app import perfiles
 from app.resumen import PLAZOS, obtener_resumen, resumen_a_json
 from app.velas import LIMITE_MAXIMO, obtener_velas, vela_a_json
+from app.volatilidad import obtener_volatilidad, volatilidad_a_json
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -299,6 +301,62 @@ def mercado_estado() -> dict[str, object]:
         "simbolos": estado_mercado.instantanea(),
         "persistencia": escritor_de_ticks.resumen(),
     }
+
+
+@app.get("/mercado/volatilidad")
+async def mercado_volatilidad(
+    simbolos: list[str] | None = Query(
+        default=None,
+        description=(
+            "Pares a medir, repetible. "
+            f"Si se omite, se devuelven todos los vigilados: {', '.join(SIMBOLOS_MVP)}."
+        ),
+    ),
+) -> JSONResponse:
+    """Cuánto se agita normalmente cada activo (paso 3.7).
+
+    Devuelve el **rango verdadero mediano** de un tramo de 5 minutos en las últimas 24
+    horas, en porcentaje del precio: la misma medida con la que la alerta #3 decide si
+    algo es raro. Se expone para que el panel muestre el número de todos los días, no
+    solo el del momento en que salta una alerta.
+
+    Un símbolo con menos de cinco horas de datos **no aparece**: una mediana sacada de un
+    rato describe ese rato, no al activo. Es un "no sé", no un cero.
+    """
+    pedidos = list(SIMBOLOS_MVP) if not simbolos else simbolos
+
+    desconocidos = [simbolo for simbolo in pedidos if simbolo not in SIMBOLOS_MVP]
+    if desconocidos:
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "simbolo_no_vigilado",
+                "detalle": f"Argos todavía no vigila: {', '.join(desconocidos)}.",
+                "disponibles": list(SIMBOLOS_MVP),
+            },
+        )
+
+    try:
+        medidas = await obtener_volatilidad(pedidos)
+    except Exception as error:
+        logger.warning("No se pudo medir la volatilidad: %s", error)
+        raise HTTPException(
+            status_code=503,
+            detail={
+                "status": "sin_conexion",
+                "detalle": str(error),
+                "pista": "¿Está levantada la base? Prueba GET /health/db",
+            },
+        ) from error
+
+    return JSONResponse(
+        content={
+            "horas": 24,
+            "simbolos": {
+                simbolo: volatilidad_a_json(medida) for simbolo, medida in medidas.items()
+            },
+        }
+    )
 
 
 @app.get("/mercado/velas")
