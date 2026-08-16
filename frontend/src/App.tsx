@@ -6,9 +6,10 @@ import { Sidebar } from '@/components/Sidebar'
 import { MarketHeader } from '@/components/MarketHeader'
 import { PanelView } from '@/components/PanelView'
 import { MercadosView } from '@/components/MercadosView'
+import { AlertasView } from '@/components/AlertasView'
 import { ChatIsland } from '@/components/ChatIsland'
 
-export type View = 'panel' | 'mercados'
+export type View = 'panel' | 'mercados' | 'alertas'
 
 export default function App() {
   const { theme, toggle } = useTheme()
@@ -64,6 +65,7 @@ export default function App() {
               pinned={pinned}
               togglePin={togglePin}
               seleccionar={seleccionar}
+              verAlertas={() => setView('alertas')}
             />
           </div>
         )}
@@ -76,6 +78,11 @@ export default function App() {
               togglePin={togglePin}
               seleccionar={seleccionar}
             />
+          </div>
+        )}
+        {view === 'alertas' && (
+          <div className="view v-alertas">
+            <AlertasView />
           </div>
         )}
       </main>

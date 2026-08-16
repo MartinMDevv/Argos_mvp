@@ -130,6 +130,22 @@ export function antiguedad(iso: string, ahora = Date.now()): string {
   return `hace ${dias} ${dias === 1 ? 'día' : 'días'}`
 }
 
+const FECHA_HORA = new Intl.DateTimeFormat('es-CL', {
+  dateStyle: 'short',
+  timeStyle: 'medium',
+})
+
+/**
+ * El instante exacto de algo, en la hora local: `12-08-2026 04:08:02`.
+ *
+ * Convive con `antiguedad()` y no la reemplaza: "hace 3 min" es lo que uno quiere leer de un
+ * vistazo, y la fecha completa es lo que hace falta cuando se va a verificar una alerta contra
+ * el gráfico o contra el exchange. La primera se lee, la segunda se comprueba.
+ */
+export function fechaHora(iso: string): string {
+  return FECHA_HORA.format(new Date(iso))
+}
+
 /** El signo que se antepone a un número: `+`, `−` (U+2212) o nada si es cero. */
 function signoDe(valor: number): string {
   if (valor > 0) return '+'

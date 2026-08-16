@@ -142,6 +142,56 @@ export interface RespuestaResumen {
   simbolos: Record<string, ResumenJSON>
 }
 
+// ---------------------------------------------------------------------------
+// Alertas (paso 3.6)
+// ---------------------------------------------------------------------------
+
+/** Cuánto pide tu atención una alerta (`SEVERIDADES` en `app/detectores/base.py`). */
+export const SEVERIDADES = ['info', 'aviso', 'fuerte'] as const
+
+export type Severidad = (typeof SEVERIDADES)[number]
+
+/**
+ * Algo que Argos vio, tal cual lo manda `GET /alertas` (ver `Alerta` en `app/modelos.py`).
+ *
+ * **`evidencia` no es un extra decorativo.** Son los números crudos con los que el detector
+ * llegó a su conclusión —el valor medido, la referencia contra la que lo comparó, el umbral
+ * cruzado—, y existen porque la regla del proyecto es que Argos no afirma nada que no se pueda
+ * verificar. El panel los muestra para que la alerta se pueda rehacer a mano, no para rellenar.
+ *
+ * Vienen como texto por el mismo motivo que los precios: son números exactos que no deben pasar
+ * por un float. Las claves cambian según el detector que la emitió, así que se muestran como lo
+ * que son —pares de nombre y valor— y el panel no supone que exista ninguna en particular.
+ */
+export interface AlertaJSON {
+  id: number
+  momento: string
+  detector: string
+  simbolo: string
+  severidad: Severidad
+  titulo: string
+  detalle: string
+  evidencia: Record<string, string>
+  /** Identidad de la SITUACIÓN, no del aviso: es con lo que el motor agrupa el antirruido. */
+  clave: string
+}
+
+export interface RespuestaAlertas {
+  cantidad: number
+  alertas: AlertaJSON[]
+}
+
+/** Una ficha de `GET /detectores`: qué vigila Argos y con qué cadencia. */
+export interface DetectorJSON {
+  nombre: string
+  titulo: string
+  descripcion: string
+  cadencia: 'por_tick' | 'por_vela_cerrada'
+  intervalo: string | null
+  velas_necesarias: number
+  silencio_segundos: number
+}
+
 /**
  * Los tres mensajes que empuja `WS /ws/mercado` (paso 1.4).
  *
@@ -206,4 +256,111 @@ export async function obtenerResumen(
 
   const datos: RespuestaResumen = await respuesta.json()
   return datos.simbolos
+}
+
+/**
+ * Trae lo último que Argos vio, de lo más nuevo a lo más viejo (paso 3.6).
+ *
+ * Sin filtro de símbolo a propósito: el feed del panel es de **todo** lo que Argos vio, no del
+ * activo que está mirando el usuario. Que ETH se dispare mientras miras BTC es justamente lo que
+ * uno quiere que le avisen.
+ */
+export async function obtenerAlertas(limite = 50, senal?: AbortSignal): Promise<AlertaJSON[]> {
+  const parametros = new URLSearchParams({ limite: String(limite) })
+
+  const respuesta = await fetch(`${URL_API}/alertas?${parametros}`, { signal: senal })
+
+  if (!respuesta.ok) {
+    throw new Error(`El backend respondió ${respuesta.status} al pedir las alertas`)
+  }
+
+  const datos: RespuestaAlertas = await respuesta.json()
+  return datos.alertas
+}
+
+/**
+ * Un precio que pediste vigilar (`Umbral` en `app/modelos.py`, paso 3.2).
+ *
+ * **Un umbral vigila una sola dirección.** Si quieres enterarte de la subida y de la bajada son
+ * dos umbrales, y así cada aviso dice exactamente qué pasó sin que haya que deducirlo.
+ */
+export interface UmbralJSON {
+  id: number
+  simbolo: string
+  valor: string
+  /** `arriba` = avisa al cruzar subiendo; `abajo`, bajando. La línea pertenece al lado de abajo. */
+  direccion: 'arriba' | 'abajo'
+  nota: string | null
+  creado: string | null
+}
+
+export interface RespuestaUmbrales {
+  /** Cuántos hay configurados. El backend lo llama así, no `cantidad`. */
+  configurados: number
+  umbrales: UmbralJSON[]
+  /**
+   * `false` = Argos todavía no pudo leer la tabla (la base estaba caída al arrancar).
+   *
+   * Importa mostrarlo: con `false`, una lista vacía **no significa que no haya umbrales**,
+   * significa que no sabemos. Decir "no tienes ninguno" en ese caso sería afirmar de más.
+   */
+  cargado_alguna_vez: boolean
+}
+
+/** Los precios que pediste vigilar. */
+export async function obtenerUmbrales(senal?: AbortSignal): Promise<RespuestaUmbrales> {
+  const respuesta = await fetch(`${URL_API}/umbrales`, { signal: senal })
+
+  if (!respuesta.ok) {
+    throw new Error(`El backend respondió ${respuesta.status} al pedir los umbrales`)
+  }
+
+  return respuesta.json()
+}
+
+/** Agrega un umbral. El backend responde 409 si ya existe uno igual. */
+export async function crearUmbral(datos: {
+  simbolo: string
+  valor: string
+  direccion: 'arriba' | 'abajo'
+  nota?: string
+}): Promise<UmbralJSON> {
+  const respuesta = await fetch(`${URL_API}/umbrales`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(datos),
+  })
+
+  if (!respuesta.ok) {
+    // El backend explica en `detail` qué pasó (duplicado, símbolo no vigilado…). Se muestra
+    // su mensaje en vez de uno genérico: sabe más que nosotros sobre lo que salió mal.
+    const cuerpo = await respuesta.json().catch(() => null)
+    const detalle = cuerpo?.detail?.detalle ?? cuerpo?.detail ?? `error ${respuesta.status}`
+    throw new Error(typeof detalle === 'string' ? detalle : `error ${respuesta.status}`)
+  }
+
+  return respuesta.json()
+}
+
+/** Saca un umbral. Devuelve `true` si estaba y se borró. */
+export async function borrarUmbral(id: number): Promise<boolean> {
+  const respuesta = await fetch(`${URL_API}/umbrales/${id}`, { method: 'DELETE' })
+
+  if (respuesta.status === 404) return false
+  if (!respuesta.ok) {
+    throw new Error(`El backend respondió ${respuesta.status} al borrar el umbral`)
+  }
+  return true
+}
+
+/** Trae el catálogo de detectores: qué vigila Argos ahora mismo. */
+export async function obtenerDetectores(senal?: AbortSignal): Promise<DetectorJSON[]> {
+  const respuesta = await fetch(`${URL_API}/detectores`, { signal: senal })
+
+  if (!respuesta.ok) {
+    throw new Error(`El backend respondió ${respuesta.status} al pedir los detectores`)
+  }
+
+  const datos: { detectores: DetectorJSON[] } = await respuesta.json()
+  return datos.detectores
 }

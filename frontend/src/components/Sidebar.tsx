@@ -1,6 +1,7 @@
 import { activoDe } from '@/lib/activos'
 import { SIN_DATO, direccion, porcentaje } from '@/lib/formato'
 import { useFichas } from '@/lib/resumen'
+import { useAlertas } from '@/lib/alertas'
 import { Peacock } from './Peacock'
 import { CoinLogo } from './CoinLogo'
 import { Icon } from './Icon'
@@ -31,6 +32,7 @@ export function Sidebar({
 }: Props) {
   const pins = order.filter((p) => pinned[p])
   const fichas = useFichas(pins)
+  const { sinLeer } = useAlertas()
 
   return (
     <nav>
@@ -46,8 +48,15 @@ export function Sidebar({
       <button type="button" className={`nav-i ${view === 'mercados' ? 'on' : ''}`} onClick={() => setView('mercados')}>
         <Icon name="mercados" /> <span className="lbl">Mercados</span>
       </button>
-      <button type="button" className="nav-i">
-        <Icon name="alertas" /> <span className="lbl">Alertas</span> <span className="badge">2</span>
+      <button
+        type="button"
+        className={`nav-i ${view === 'alertas' ? 'on' : ''}`}
+        onClick={() => setView('alertas')}
+      >
+        <Icon name="alertas" /> <span className="lbl">Alertas</span>
+        {/* El contador sale de lo que Argos vio y todavía no miraste. Sin alertas nuevas no
+            hay globo: un "0" permanente es ruido, y un número inventado sería peor. */}
+        {sinLeer > 0 && <span className="badge">{sinLeer}</span>}
       </button>
 
       <div className="navsec">Asistente</div>

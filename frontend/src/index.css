@@ -169,10 +169,11 @@
   .view{display:none;}
   .app[data-view="panel"] .v-panel{display:flex; flex-direction:column; gap:12px;}
   .app[data-view="mercados"] .v-mercados{display:flex; flex-direction:column; gap:12px;}
+  .app[data-view="alertas"] .v-alertas{display:flex; flex-direction:column; gap:12px;}
   /* transición suave al cambiar de vista */
   @keyframes viewin{from{opacity:0; transform:translateY(6px);}}
-  .app[data-view="panel"] .v-panel, .app[data-view="mercados"] .v-mercados{animation:viewin .22s ease;}
-  @media (prefers-reduced-motion:reduce){ .app[data-view="panel"] .v-panel, .app[data-view="mercados"] .v-mercados{animation:none;} }
+  .app[data-view="panel"] .v-panel, .app[data-view="mercados"] .v-mercados, .app[data-view="alertas"] .v-alertas{animation:viewin .22s ease;}
+  @media (prefers-reduced-motion:reduce){ .app[data-view="panel"] .v-panel, .app[data-view="mercados"] .v-mercados, .app[data-view="alertas"] .v-alertas{animation:none;} }
   .panel{background:var(--surface); border:1px solid var(--line); border-radius:var(--radius-sm); padding:13px; position:relative;}
   .panel h3{margin:0; font-size:10px; letter-spacing:.1em; text-transform:uppercase; color:var(--faint); font-weight:700;}
   .panel .fig{position:absolute; top:12px; right:13px;}
@@ -252,6 +253,49 @@
   .pev.lo .st{color:var(--muted);} .pev.lo .pip{background:var(--faint);}
   .pev .meta{color:var(--faint); font-weight:400; font-size:10.5px; margin-left:4px;}
   .pev ul{margin:0; padding-left:16px; color:var(--muted); font-size:11.5px; line-height:1.5;} .pev ul b{color:var(--text); font-weight:600;}
+
+  /* Vista Alertas y feed en vivo (paso 3.6) --------------------------------- */
+
+  /* Cuando no hay nada que mostrar se dice, en vez de dejar un hueco: en Argos "no vi nada"
+     es una respuesta legítima y la más frecuente, no un error ni una pantalla a medio cargar. */
+  .vacio{color:var(--faint); font-size:11.5px; line-height:1.6; margin:2px 0 0;}
+
+  /* Enlace de texto para acciones secundarias ("ver la cuenta", "ver todas"). */
+  .lnk{font-family:inherit; font-size:11px; color:var(--teal); background:none; border:0; padding:0; margin-top:7px; cursor:pointer; text-decoration:underline; text-underline-offset:3px; text-decoration-color:var(--teal-dim);}
+  .lnk:hover{color:var(--text);}
+  .pulse-h .lnk{margin-top:0;}
+
+  .filtros{display:flex; flex-wrap:wrap; gap:6px; margin-bottom:10px;}
+  .chip{font-family:inherit; font-size:10.5px; color:var(--muted); background:var(--surface-2); border:1px solid var(--line); border-radius:999px; padding:4px 10px; cursor:pointer; transition:.13s;}
+  .chip:hover{border-color:var(--line-strong); color:var(--text);}
+  .chip.on{color:var(--bg); background:var(--teal); border-color:var(--teal);}
+
+  /* La evidencia: los números crudos con los que el detector llegó a su conclusión. Va en
+     monoespaciada y alineada para poder compararla de un vistazo con el gráfico. */
+  .evidencia{margin-top:9px; padding:9px 11px; background:var(--surface-2); border:1px solid var(--line-soft); border-radius:8px;}
+  .ev-fecha{font-size:10.5px; color:var(--faint); margin-bottom:6px;}
+  /* La tabla se ajusta al contenido (`width:auto`) y NO al ancho del panel: estirada, cada
+     valor quedaba a media pantalla de su etiqueta y había que seguir la fila con el dedo. */
+  .evidencia table{width:auto; border-collapse:collapse;}
+  .evidencia tr + tr td{border-top:1px solid var(--line-soft);}
+  .evidencia td{padding:3px 0; vertical-align:top;}
+  .ev-k{color:var(--faint); font-size:10.5px; text-transform:capitalize; padding-right:18px; white-space:nowrap;}
+  .ev-v{color:var(--text); font-size:11px; text-align:left; word-break:break-all; padding-left:8px;}
+
+  /* Umbrales: la única configuración del MVP que se toca desde la pantalla (paso 3.6). */
+  .umbral-form{display:flex; flex-wrap:wrap; gap:7px; align-items:center; margin-bottom:11px;}
+  .umbral-form select, .umbral-form input{font-family:inherit; font-size:11.5px; color:var(--text); background:var(--surface-2); border:1px solid var(--line-strong); border-radius:7px; padding:6px 9px;}
+  .umbral-form input[type="number"]{font-family:var(--mono); width:130px;}
+  .umbral-form input.nota{flex:1; min-width:120px;}
+  .umbral-form button{font-family:inherit; font-size:11.5px; color:var(--bg,#0E0E11); background:var(--teal); border:1px solid var(--teal); border-radius:7px; padding:6px 13px; cursor:pointer; font-weight:600;}
+  .umbral-form button:disabled{opacity:.5; cursor:not-allowed;}
+  .umbral{display:flex; align-items:center; gap:10px; padding:8px 0; border-top:1px solid var(--line-soft); font-size:11.5px;}
+  .umbral:first-of-type{border-top:0;}
+  .umbral .val{font-family:var(--mono); font-weight:600; color:var(--text);}
+  .umbral .dir{font-size:10.5px; color:var(--faint); text-transform:uppercase; letter-spacing:.06em;}
+  .umbral .nota{color:var(--muted); flex:1;}
+  .umbral .quitar{font-family:inherit; font-size:11px; color:var(--faint); background:none; border:0; cursor:pointer; padding:2px 6px;}
+  .umbral .quitar:hover{color:var(--bear);}
 
   .kpis{display:grid; grid-template-columns:repeat(6,1fr); gap:9px;}
   @media (max-width:860px){ .kpis{grid-template-columns:repeat(3,1fr);} }

@@ -11,12 +11,22 @@ interface Props {
   pinned: Record<string, boolean>
   togglePin: (par: string) => void
   seleccionar: (par: string) => void
+  /** Saltar a la vista Alertas, desde el "ver todas" del recuadro. */
+  verAlertas: () => void
 }
 
 // Vista Panel: estado + gráfico de velas + (favoritos | lo que Argos vio).
 // Desde el paso 2.2b el gráfico ya no está clavado en BTCUSDT · 1m: sigue lo que eligió el
 // usuario en la watchlist, en el menú y en los botones de tramo de la cabecera.
-export function PanelView({ par, intervalo, order, pinned, togglePin, seleccionar }: Props) {
+export function PanelView({
+  par,
+  intervalo,
+  order,
+  pinned,
+  togglePin,
+  seleccionar,
+  verAlertas,
+}: Props) {
   const activo = activoDe(par)
 
   return (
@@ -39,7 +49,7 @@ export function PanelView({ par, intervalo, order, pinned, togglePin, selecciona
           par={par}
           seleccionar={seleccionar}
         />
-        <PulseCard />
+        <PulseCard verTodas={verAlertas} />
       </div>
     </>
   )

@@ -228,7 +228,27 @@ TimescaleDB → velas → empujado al panel.
   10-oct-2025 **sube a `fuerte`**, que antes se quedaba corto. Comparar contra la mediana en vez de
   un promedio hace de esto un ATR robusto. Además, el cálculo de mediana+MAD que comparten la #3 y
   la #4 se mudó a `detectores/estadistica.py`, para que el "por qué robusto" esté escrito una vez.)*
-- [ ] **3.6** Panel de alertas en el dashboard + configuración de umbrales
+- [x] **3.6** Panel de alertas en el dashboard + configuración de umbrales ✅
+  *(`lib/alertas.tsx` (proveedor), `components/AlertasView.tsx`, `components/Umbrales.tsx` y
+  `PulseCard.tsx` reescrito. **Se acabó la maqueta**: el recuadro "Lo que Argos vio" mostraba tres
+  eventos inventados desde el paso 0.4 y ahora muestra lo que emitieron los detectores de verdad.
+  El banner de arriba también: decía "Mercado tranquilo" pasara lo que pasara, y ahora cuenta
+  cuántas alertas hubo en la última hora — afirmar calma sin mirar es exactamente lo que la regla
+  de oro prohíbe, y era la propia app la que lo hacía.
+  **La vista Alertas muestra la evidencia**: cada alerta se abre y enseña los números crudos con
+  los que el detector llegó a su conclusión. Esa es la regla del proyecto puesta en pantalla —
+  Argos no pide que le crean, muestra la cuenta. Las claves se pintan tal cual vienen, así que un
+  detector nuevo aparece ahí sin tocar el frontend. Hay filtros por detector, que salen de
+  `GET /detectores` (nada escrito a mano).
+  **Umbrales configurables desde la pantalla**: crear y quitar los precios que vigilas, con el
+  precio actual como referencia en el campo. Después de crear o borrar **se vuelve a preguntar** en
+  vez de creerle a la respuesta: la lista del backend es la copia en memoria que mira el detector,
+  así que si algo aparece ahí está siendo vigilado de verdad. Y si `cargado_alguna_vez` es `false`
+  se dice, porque ahí una lista vacía no significa "no tienes ninguno" sino "no sabemos".
+  El contador del menú (que decía `2` fijo) ahora cuenta lo que no miraste, guardando en
+  `localStorage` el id de la última vista — es una preferencia de la pantalla, no un hecho del
+  mercado, así que no ensucia la tabla de alertas. Verificado de punta a punta en el navegador:
+  crear → el detector lo toma (`Umbral nuevo: BTCUSDT arriba 63100` en el log) → listar → borrar.)*
 
 ## FASE 4 — Notificaciones
 - [ ] **4.1** Crear el bot de Telegram y conectar el envío de alertas
@@ -274,9 +294,12 @@ contra un número que pusimos nosotros, sino contra lo que ese activo viene haci
 del volumen, contra lo que hace **a esta hora**—. **Las cuatro alertas del MVP están hechas.** Entre
 las cuatro hablan unas 10 veces al mes por símbolo, medido sobre un año de historia real.
 
-Siguiente: **3.6 — el panel de alertas**, que es lo que falta para que todo esto se vea. Hoy Argos
-detecta y guarda, pero el recuadro "LO QUE ARGOS VIO" del panel sigue siendo maqueta: hay que
-enchufarlo a `GET /alertas` y sumar la configuración de umbrales desde la interfaz.
+Y con el **3.6** todo eso ya se ve: el panel dejó de tener datos inventados, la vista Alertas
+muestra la evidencia de cada hallazgo y los umbrales se ponen desde la pantalla. **FASE 3 COMPLETA.**
+
+Siguiente: **FASE 4 — que Argos te encuentre a ti**. Hoy hay que estar mirando la pantalla para
+enterarse, y el sentido del proyecto es no tener que mirarla: toca el bot de Telegram (4.1) y las
+notificaciones dentro del panel (4.2).
 
 ### Cómo levantar el frontend
 ```bash

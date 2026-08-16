@@ -58,3 +58,13 @@ export function activoDe(par: string): Activo | undefined {
 
 /** El primer activo del catálogo. Es con el que arranca el panel. */
 export const ACTIVO_POR_DEFECTO = ACTIVOS[0]
+
+/**
+ * El nombre corto de un par, para escribirlo en pantalla: `BTCUSDT` → `BTC`.
+ *
+ * Si el par no está en el catálogo devuelve el par entero en vez de un hueco: es feo a propósito,
+ * porque significa que el catálogo quedó atrás respecto del backend y eso hay que verlo.
+ */
+export function simboloDe(par: string): string {
+  return POR_PAR.get(par)?.simbolo ?? par
+}

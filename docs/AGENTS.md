@@ -213,8 +213,21 @@ Range de Wilder, lo que hay debajo del ATR): captura los huecos entre tramos, qu
 real que antes se perdía. Recalibrado, los umbrales aguantan y el 10-oct-2025 sube a `fuerte`.
 El cálculo mediana+MAD compartido por la #3 y la #4 vive ahora en `detectores/estadistica.py`
 (está en `INFRAESTRUCTURA` del registro, no es un detector).
-**Siguiente: 3.6 (panel de alertas en el dashboard + configuración de umbrales). El recuadro "LO QUE
-ARGOS VIO" del panel sigue siendo maqueta: hay que enchufarlo a `GET /alertas`.**
+**3.6 HECHO (panel de alertas + umbrales desde la pantalla) → FASE 3 COMPLETA**:
+`lib/alertas.tsx` (proveedor, un solo pedido para toda la app), `components/AlertasView.tsx`,
+`components/Umbrales.tsx`, `PulseCard.tsx` reescrito. Se acabó la maqueta del 0.4: el recuadro "Lo
+que Argos vio" mostraba tres eventos inventados y el banner decía "Mercado tranquilo" pasara lo que
+pasara — la propia app afirmaba calma sin mirar, que es justo lo que la regla de oro prohíbe. La
+vista Alertas **muestra la evidencia** de cada hallazgo (claves tal cual vienen: un detector nuevo
+aparece sin tocar el frontend) y filtra por detector con `GET /detectores`. Umbrales: crear/quitar
+con el precio actual de referencia; **después de escribir se vuelve a preguntar**, porque la lista
+del backend es la copia en memoria que mira el detector. Si `cargado_alguna_vez` es `false` se
+avisa: ahí una lista vacía no es "no tienes ninguno" sino "no sabemos". El contador del menú cuenta
+lo no leído contra un id guardado en `localStorage` (es preferencia de pantalla, no un hecho: no va
+a la base). ⚠️ Al agregar una vista nueva hay que sumarla al CSS (`.app[data-view="X"] .v-X`) o
+queda en blanco: `.view{display:none}` es el estado por defecto.
+**Siguiente: FASE 4 — 4.1 bot de Telegram, 4.2 notificaciones en el panel. Hoy hay que estar
+mirando la pantalla para enterarse, y el sentido de Argos es no tener que mirarla.**
 Estado tildable en CHECKLIST.md. Norte: MVP (v1.0) primero; el mercado se expande por versiones (v1.1 -> v5.0)
 hasta un posible producto con suscripción. El motor del MVP se reutiliza en cada fase, no se reescribe.
 Pendiente de diseño: el logo del pavo real es un placeholder SVG → reemplazar por un vector pulido.
